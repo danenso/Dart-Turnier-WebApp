@@ -382,7 +382,7 @@ export default function MatchPage() {
     }
 
     return (
-      <div className={`flex border-b ${isActive ? 'bg-blue-50/50' : 'bg-white'}`}>
+      <div className={`flex border-b dark:border-zinc-800 ${isActive ? 'bg-blue-50/50 dark:bg-blue-900/20' : 'bg-white dark:bg-zinc-900'}`}>
         <div className={`w-2 ${isActive ? 'bg-red-600' : 'bg-transparent'}`}></div>
         <div className="flex-1 p-4 flex flex-col justify-center border-r">
           <div className="flex justify-between items-center mb-1">
@@ -430,7 +430,7 @@ export default function MatchPage() {
         <div className="w-20"></div>
       </div>
 
-      <div className="flex-1 w-full flex flex-col lg:flex-row bg-white shadow-lg mt-0 overflow-hidden">
+      <div className="flex-1 w-full flex flex-col lg:flex-row bg-white dark:bg-zinc-900 shadow-lg mt-0 overflow-hidden">
         
         {/* Scoreboard */}
         <div className="flex flex-col border-b-4 lg:border-b-0 lg:border-r-4 border-slate-800 flex-1">
@@ -470,7 +470,7 @@ export default function MatchPage() {
                 <Button 
                   key={num} 
                   variant="outline" 
-                  className="h-full text-xl font-bold bg-white hover:bg-zinc-100 rounded-none border-zinc-300"
+                  className="h-full text-xl font-bold bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-none border-zinc-300 dark:border-zinc-700"
                   onClick={() => handleDartInput(num)}
                 >
                   {num}
@@ -479,7 +479,7 @@ export default function MatchPage() {
               
               <Button 
                 variant="outline" 
-                className="h-full text-xl font-bold bg-white hover:bg-zinc-100 rounded-none border-zinc-300 col-span-1"
+                className="h-full text-xl font-bold bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-none border-zinc-300 dark:border-zinc-700 col-span-1"
                 onClick={() => handleDartInput(0)}
               >
                 0

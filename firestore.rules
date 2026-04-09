@@ -33,7 +33,8 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "hello@danenso.com" && request.auth.token.email_verified == true));
+          (request.auth.token.email == "hello@danenso.com" && request.auth.token.email_verified == true) ||
+          request.auth.uid == 'xV97IDspMmYcUkXvPP1eOlJD3KI2');
     }
 
     // ===============================================================
@@ -112,6 +113,13 @@ service cloud.firestore {
     // ===============================================================
     // Rules
     // ===============================================================
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuthenticated() && isAdmin() && isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && isAdmin() && isValidUser(request.resource.data);
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+
     match /players/{playerId} {
       allow read: if isOwner(resource.data.ownerId) || (isAuthenticated() && resource.data.authUid == request.auth.uid) || isAdmin();
       allow create: if isAuthenticated() && isValidGlobalPlayer(request.resource.data);
@@ -120,30 +128,30 @@ service cloud.firestore {
     }
 
     match /tournaments/{tournamentId} {
-      allow read: if isOwner(resource.data.ownerId);
+      allow read: if isOwner(resource.data.ownerId) || isAdmin();
       allow create: if isAuthenticated() && isValidTournament(request.resource.data);
-      allow update: if isOwner(resource.data.ownerId) && isValidTournament(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
-      allow delete: if isOwner(resource.data.ownerId);
+      allow update: if (isOwner(resource.data.ownerId) || isAdmin()) && isValidTournament(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
 
       match /players/{playerId} {
-        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
-        allow create: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidPlayer(request.resource.data);
-        allow update: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidPlayer(request.resource.data);
-        allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
+        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();
+        allow create: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidPlayer(request.resource.data);
+        allow update: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidPlayer(request.resource.data);
+        allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();
       }
 
       match /matches/{matchId} {
-        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
-        allow create: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidMatch(request.resource.data);
-        allow update: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidMatch(request.resource.data);
-        allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
+        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();
+        allow create: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidMatch(request.resource.data);
+        allow update: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidMatch(request.resource.data);
+        allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();
       }
 
       match /tiebreaks/{tiebreakId} {
-        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
-        allow create: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidTiebreak(request.resource.data);
-        allow update: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidTiebreak(request.resource.data);
-        allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
+        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();
+        allow create: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidTiebreak(request.resource.data);
+        allow update: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidTiebreak(request.resource.data);
+        allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();
       }
     }
   }

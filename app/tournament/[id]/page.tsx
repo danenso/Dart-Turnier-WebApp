@@ -399,7 +399,7 @@ export default function TournamentPage() {
                 <CardContent>
                   <div className="space-y-2">
                     {players.map((p, i) => (
-                      <div key={p.id} className="flex items-center justify-between p-3 bg-white border rounded-lg">
+                      <div key={p.id} className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg">
                         <div className="flex items-center gap-3">
                           <span className="text-zinc-400 w-6">{i + 1}.</span>
                           <span className="font-medium">{p.name}</span>
@@ -484,7 +484,7 @@ export default function TournamentPage() {
                   className={`cursor-pointer hover:border-zinc-400 transition-colors ${
                     m.status === 'completed' ? 'bg-zinc-100 opacity-75' : 
                     m.status === 'in_progress' ? 'bg-green-50 border-green-200' : 
-                    'bg-white'
+                    'bg-white dark:bg-zinc-900'
                   }`} 
                   onClick={() => router.push(`/tournament/${id}/match/${m.id}`)}
                 >
@@ -496,7 +496,7 @@ export default function TournamentPage() {
                           {m.isDraw ? 'D' : m.winnerId === m.playerAId ? 'W' : 'L'}
                         </span>
                       ) : (
-                        <span className="text-2xl font-mono bg-white px-3 py-1 rounded border">{m.playerALegs}</span>
+                        <span className="text-2xl font-mono bg-white dark:bg-zinc-900 px-3 py-1 rounded border dark:border-zinc-800">{m.playerALegs}</span>
                       )}
                     </div>
                     <div className="px-4 flex flex-col items-center">
@@ -511,7 +511,7 @@ export default function TournamentPage() {
                           {m.isDraw ? 'D' : m.winnerId === m.playerBId ? 'W' : 'L'}
                         </span>
                       ) : (
-                        <span className="text-2xl font-mono bg-white px-3 py-1 rounded border">{m.playerBLegs}</span>
+                        <span className="text-2xl font-mono bg-white dark:bg-zinc-900 px-3 py-1 rounded border dark:border-zinc-800">{m.playerBLegs}</span>
                       )}
                       <span className={`font-bold ${m.status === 'completed' ? (m.isDraw ? 'text-orange-500' : m.winnerId === m.playerBId ? 'text-green-600' : 'text-red-600') : ''}`}>{m.playerBName}</span>
                     </div>
@@ -527,7 +527,7 @@ export default function TournamentPage() {
           </TabsContent>
           
           <TabsContent value="bracket">
-            <div className="grid md:grid-cols-3 gap-8 p-4 bg-white rounded-lg border overflow-x-auto">
+            <div className="grid md:grid-cols-3 gap-8 p-4 bg-white dark:bg-zinc-900 rounded-lg border dark:border-zinc-800 overflow-x-auto">
               <div className="space-y-4 min-w-[200px]">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-zinc-500 uppercase text-sm">Quarter Finals</h3>
@@ -635,7 +635,7 @@ export default function TournamentPage() {
                       else if (index === 4) seasonPoints += 2;
 
                       return (
-                        <div key={p.id} className="flex items-center justify-between p-4 border rounded-lg bg-white">
+                        <div key={p.id} className="flex items-center justify-between p-4 border dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900">
                           <div className="flex items-center gap-4">
                             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600">
                               {index + 1}

@@ -32,7 +32,7 @@ export default function AccountPage() {
         <p className="text-zinc-500">Manage your account details and view your statistics.</p>
         
         {user && (
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-zinc-200">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-800">
             <h2 className="text-xl font-semibold mb-4">Profile Information</h2>
             <div className="space-y-2">
               <p><span className="font-medium">Name:</span> {user.displayName || playerProfile?.name || 'N/A'}</p>
@@ -47,8 +47,8 @@ export default function AccountPage() {
           <div className="space-y-6">
             <h2 className="text-2xl font-bold tracking-tight">Your Statistics</h2>
             
-            <div className="flex items-center gap-6 bg-white p-6 rounded-lg shadow-sm border border-zinc-200">
-              <div className="w-24 h-24 rounded-full bg-zinc-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-sm">
+            <div className="flex items-center gap-6 bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-800">
+              <div className="w-24 h-24 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border-4 border-white dark:border-zinc-900 shadow-sm">
                 {playerProfile.avatar ? (
                   <img src={playerProfile.avatar} alt={playerProfile.name} className="w-full h-full object-cover" />
                 ) : (
