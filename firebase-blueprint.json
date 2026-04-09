@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "GlobalPlayer": {
+      "title": "Global Player",
+      "description": "A player master record that can participate in multiple tournaments.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the player."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who created this player."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the player was created."
+        }
+      },
+      "required": ["name", "ownerId", "createdAt"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "A dart tournament",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "groups", "tiebreaks", "bracket", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["title", "status", "createdAt", "ownerId"]
+    },
+    "Player": {
+      "title": "Player",
+      "description": "A player in a tournament",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "groupId": { "type": "string" },
+        "points": { "type": "number" },
+        "matchesPlayed": { "type": "number" },
+        "wins": { "type": "number" },
+        "draws": { "type": "number" },
+        "losses": { "type": "number" },
+        "rank": { "type": "number" },
+        "seed": { "type": "number" }
+      },
+      "required": ["name", "points", "matchesPlayed", "wins", "draws", "losses"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "A dart match between two players",
+      "type": "object",
+      "properties": {
+        "phase": { "type": "string", "enum": ["group", "quarter", "semi", "final"] },
+        "playerAId": { "type": "string" },
+        "playerBId": { "type": "string" },
+        "playerAName": { "type": "string" },
+        "playerBName": { "type": "string" },
+        "playerALegs": { "type": "number" },
+        "playerBLegs": { "type": "number" },
+        "currentLeg": { "type": "number" },
+        "playerAStartsLeg": { "type": "boolean" },
+        "currentTurnId": { "type": "string" },
+        "playerARest": { "type": "number" },
+        "playerBRest": { "type": "number" },
+        "answerThrowActive": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] },
+        "winnerId": { "type": "string" },
+        "isDraw": { "type": "boolean" },
+        "format": { "type": "string", "enum": ["301_bo1", "301_bo3", "501_bo3"] }
+      },
+      "required": ["phase", "playerAId", "playerBId", "status", "format"]
+    },
+    "Tiebreak": {
+      "title": "Tiebreak",
+      "description": "A tiebreak match between multiple players",
+      "type": "object",
+      "properties": {
+        "targetNumber": { "type": "number" },
+        "playerIds": { "type": "array", "items": { "type": "string" } },
+        "playerNames": { "type": "array", "items": { "type": "string" } },
+        "scores": { "type": "object", "additionalProperties": { "type": "number" } },
+        "currentRound": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] },
+        "winnerId": { "type": "string" }
+      },
+      "required": ["targetNumber", "playerIds", "playerNames", "scores", "currentRound", "status"]
+    }
+  },
+  "firestore": {
+    "/players/{playerId}": {
+      "schema": {
+        "$ref": "#/entities/GlobalPlayer"
+      },
+      "description": "Global players collection."
+    },
+    "/tournaments/{tournamentId}": {
+      "schema": { "$ref": "#/entities/Tournament" },
+      "description": "The main tournament document"
+    },
+    "/tournaments/{tournamentId}/players/{playerId}": {
+      "schema": { "$ref": "#/entities/Player" },
+      "description": "Players participating in a specific tournament"
+    },
+    "/tournaments/{tournamentId}/matches/{matchId}": {
+      "schema": { "$ref": "#/entities/Match" },
+      "description": "Matches within a specific tournament"
+    },
+    "/tournaments/{tournamentId}/tiebreaks/{tiebreakId}": {
+      "schema": { "$ref": "#/entities/Tiebreak" },
+      "description": "Tiebreaks within a specific tournament"
+    }
+  }
+}

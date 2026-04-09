@@ -1,0 +1,133 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(ownerId) {
+      return isAuthenticated() && request.auth.uid == ownerId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidStringLength(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidGlobalPlayer(data) {
+      return hasRequiredFields(['name', 'ownerId', 'createdAt']) &&
+             isValidStringLength(data.name, 1, 50) &&
+             data.ownerId == request.auth.uid &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidTournament(data) {
+      return hasRequiredFields(['title', 'status', 'createdAt', 'ownerId']) &&
+             isValidStringLength(data.title, 1, 100) &&
+             data.status in ['draft', 'groups', 'tiebreaks', 'bracket', 'completed'] &&
+             isValidDateString(data.createdAt) &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidPlayer(data) {
+      return hasRequiredFields(['name', 'points', 'matchesPlayed', 'wins', 'draws', 'losses']) &&
+             isValidStringLength(data.name, 1, 50) &&
+             data.points is number && data.points >= 0 &&
+             data.matchesPlayed is number && data.matchesPlayed >= 0 &&
+             data.wins is number && data.wins >= 0 &&
+             data.draws is number && data.draws >= 0 &&
+             data.losses is number && data.losses >= 0 &&
+             (!('groupId' in data) || data.groupId is string) &&
+             (!('rank' in data) || data.rank is number) &&
+             (!('seed' in data) || data.seed is number);
+    }
+
+    function isValidMatch(data) {
+      return hasRequiredFields(['phase', 'playerAId', 'playerBId', 'status', 'format']) &&
+             data.phase in ['group', 'quarter', 'semi', 'final'] &&
+             data.playerAId is string && data.playerBId is string &&
+             data.status in ['pending', 'in_progress', 'completed'] &&
+             data.format in ['301_bo1', '301_bo3', '501_bo3'] &&
+             (!('playerAName' in data) || data.playerAName is string) &&
+             (!('playerBName' in data) || data.playerBName is string) &&
+             (!('playerALegs' in data) || data.playerALegs is number) &&
+             (!('playerBLegs' in data) || data.playerBLegs is number) &&
+             (!('currentLeg' in data) || data.currentLeg is number) &&
+             (!('playerAStartsLeg' in data) || data.playerAStartsLeg is bool) &&
+             (!('currentTurnId' in data) || data.currentTurnId is string) &&
+             (!('playerARest' in data) || data.playerARest is number) &&
+             (!('playerBRest' in data) || data.playerBRest is number) &&
+             (!('answerThrowActive' in data) || data.answerThrowActive is bool) &&
+             (!('winnerId' in data) || data.winnerId is string) &&
+             (!('isDraw' in data) || data.isDraw is bool);
+    }
+
+    function isValidTiebreak(data) {
+      return hasRequiredFields(['targetNumber', 'playerIds', 'playerNames', 'scores', 'currentRound', 'status']) &&
+             data.targetNumber is number && data.targetNumber >= 1 && data.targetNumber <= 20 &&
+             data.playerIds is list && data.playerIds.size() >= 2 && data.playerIds.size() <= 20 &&
+             data.playerNames is list && data.playerNames.size() == data.playerIds.size() &&
+             data.scores is map &&
+             data.currentRound is number && data.currentRound >= 1 &&
+             data.status in ['pending', 'in_progress', 'completed'] &&
+             (!('winnerId' in data) || data.winnerId is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /players/{playerId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isAuthenticated() && isValidGlobalPlayer(request.resource.data);
+      allow update: if isOwner(resource.data.ownerId) && isValidGlobalPlayer(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isAuthenticated() && isValidTournament(request.resource.data);
+      allow update: if isOwner(resource.data.ownerId) && isValidTournament(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isOwner(resource.data.ownerId);
+
+      match /players/{playerId} {
+        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
+        allow create: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidPlayer(request.resource.data);
+        allow update: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidPlayer(request.resource.data);
+        allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
+      }
+
+      match /matches/{matchId} {
+        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
+        allow create: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidMatch(request.resource.data);
+        allow update: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidMatch(request.resource.data);
+        allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
+      }
+
+      match /tiebreaks/{tiebreakId} {
+        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
+        allow create: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidTiebreak(request.resource.data);
+        allow update: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) && isValidTiebreak(request.resource.data);
+        allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId);
+      }
+    }
+  }
+}
