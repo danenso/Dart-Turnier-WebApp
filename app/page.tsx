@@ -3,10 +3,13 @@
 import { useFirebase } from '@/components/FirebaseProvider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Target } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
 
@@ -15,6 +18,14 @@ export default function Home() {
   const router = useRouter();
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // Form state
+  const [title, setTitle] = useState('');
+  const [allowSingleOut, setAllowSingleOut] = useState(false);
+  const [allowDoubleOut, setAllowDoubleOut] = useState(true);
+  const [allowTripleOut, setAllowTripleOut] = useState(false);
+  const [allowDraw, setAllowDraw] = useState(false);
 
   useEffect(() => {
     if (!isAuthReady || !user) return;
@@ -37,19 +48,22 @@ export default function Home() {
   }, [user, isAuthReady]);
 
   const createTournament = async () => {
-    if (!user) return;
+    if (!user || !title.trim()) return;
     setIsCreating(true);
     try {
       const docRef = await addDoc(collection(db, 'tournaments'), {
-        title: `Tournament ${new Date().toLocaleDateString()}`,
+        title: title.trim(),
         status: 'draft',
+        allowSingleOut,
+        allowDoubleOut,
+        allowTripleOut,
+        allowDraw,
         createdAt: new Date().toISOString(),
         ownerId: user.uid
       });
       router.push(`/tournament/${docRef.id}`);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'tournaments');
-    } finally {
       setIsCreating(false);
     }
   };
@@ -78,16 +92,61 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 md:p-8">
+    <div className="p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Your Tournaments</h1>
             <p className="text-zinc-500">Manage your dart events and track results.</p>
           </div>
-          <Button onClick={createTournament} disabled={isCreating}>
-            {isCreating ? 'Creating...' : 'New Tournament'}
-          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Button onClick={() => setIsDialogOpen(true)}>New Tournament</Button>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Tournament</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="title">Tournament Name *</Label>
+                  <Input 
+                    id="title" 
+                    value={title} 
+                    onChange={(e) => setTitle(e.target.value)} 
+                    placeholder="e.g. Freitagsturnier April" 
+                    required
+                  />
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label>Out Rules</Label>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="singleOut" checked={allowSingleOut} onChange={(e) => setAllowSingleOut(e.target.checked)} />
+                    <Label htmlFor="singleOut" className="font-normal">Single Out (incl. Bull)</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="doubleOut" checked={allowDoubleOut} onChange={(e) => setAllowDoubleOut(e.target.checked)} />
+                    <Label htmlFor="doubleOut" className="font-normal">Double Out (incl. Bull's Eye)</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="tripleOut" checked={allowTripleOut} onChange={(e) => setAllowTripleOut(e.target.checked)} />
+                    <Label htmlFor="tripleOut" className="font-normal">Triple Out (incl. Bull's Eye)</Label>
+                  </div>
+                </div>
+                <div className="grid gap-2 mt-4">
+                  <Label>Match Rules</Label>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="allowDraw" checked={allowDraw} onChange={(e) => setAllowDraw(e.target.checked)} />
+                    <Label htmlFor="allowDraw" className="font-normal">Allow Draw (Best of 1 only)</Label>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                <Button onClick={createTournament} disabled={isCreating || !title.trim()}>
+                  {isCreating ? 'Creating...' : 'Create Tournament'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -28,6 +28,10 @@
       "properties": {
         "title": { "type": "string" },
         "status": { "type": "string", "enum": ["draft", "groups", "tiebreaks", "bracket", "completed"] },
+        "allowSingleOut": { "type": "boolean" },
+        "allowDoubleOut": { "type": "boolean" },
+        "allowTripleOut": { "type": "boolean" },
+        "allowDraw": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" },
         "ownerId": { "type": "string" }
       },

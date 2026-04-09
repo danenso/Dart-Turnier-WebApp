@@ -312,7 +312,7 @@ export default function TournamentPage() {
   if (!tournament) return <div className="p-8">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-4 md:p-8">
+    <div className="p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
         <Button variant="ghost" onClick={() => router.push('/')} className="-ml-4 mb-2">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
@@ -459,11 +459,25 @@ export default function TournamentPage() {
           <TabsContent value="matches">
             <div className="grid gap-4">
               {matches.map(m => (
-                <Card key={m.id} className="cursor-pointer hover:border-zinc-400 transition-colors" onClick={() => router.push(`/tournament/${id}/match/${m.id}`)}>
+                <Card 
+                  key={m.id} 
+                  className={`cursor-pointer hover:border-zinc-400 transition-colors ${
+                    m.status === 'completed' ? 'bg-zinc-100 opacity-75' : 
+                    m.status === 'in_progress' ? 'bg-green-50 border-green-200' : 
+                    'bg-white'
+                  }`} 
+                  onClick={() => router.push(`/tournament/${id}/match/${m.id}`)}
+                >
                   <CardContent className="p-4 flex items-center justify-between">
                     <div className="flex-1 flex items-center justify-end gap-4">
-                      <span className={`font-bold ${m.winnerId === m.playerAId ? 'text-green-600' : ''}`}>{m.playerAName}</span>
-                      <span className="text-2xl font-mono bg-zinc-100 px-3 py-1 rounded">{m.playerALegs}</span>
+                      <span className={`font-bold ${m.status === 'completed' ? (m.isDraw ? 'text-orange-500' : m.winnerId === m.playerAId ? 'text-green-600' : 'text-red-600') : ''}`}>{m.playerAName}</span>
+                      {m.status === 'completed' ? (
+                        <span className={`text-2xl font-bold px-3 py-1 rounded ${m.isDraw ? 'text-orange-500 bg-orange-50' : m.winnerId === m.playerAId ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                          {m.isDraw ? 'D' : m.winnerId === m.playerAId ? 'W' : 'L'}
+                        </span>
+                      ) : (
+                        <span className="text-2xl font-mono bg-white px-3 py-1 rounded border">{m.playerALegs}</span>
+                      )}
                     </div>
                     <div className="px-4 flex flex-col items-center">
                       <span className="text-zinc-400 text-sm font-medium">
@@ -472,8 +486,14 @@ export default function TournamentPage() {
                       <span className="text-[10px] text-zinc-400 uppercase">{m.phase}</span>
                     </div>
                     <div className="flex-1 flex items-center justify-start gap-4">
-                      <span className="text-2xl font-mono bg-zinc-100 px-3 py-1 rounded">{m.playerBLegs}</span>
-                      <span className={`font-bold ${m.winnerId === m.playerBId ? 'text-green-600' : ''}`}>{m.playerBName}</span>
+                      {m.status === 'completed' ? (
+                        <span className={`text-2xl font-bold px-3 py-1 rounded ${m.isDraw ? 'text-orange-500 bg-orange-50' : m.winnerId === m.playerBId ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                          {m.isDraw ? 'D' : m.winnerId === m.playerBId ? 'W' : 'L'}
+                        </span>
+                      ) : (
+                        <span className="text-2xl font-mono bg-white px-3 py-1 rounded border">{m.playerBLegs}</span>
+                      )}
+                      <span className={`font-bold ${m.status === 'completed' ? (m.isDraw ? 'text-orange-500' : m.winnerId === m.playerBId ? 'text-green-600' : 'text-red-600') : ''}`}>{m.playerBName}</span>
                     </div>
                   </CardContent>
                 </Card>

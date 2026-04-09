@@ -6,8 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { getCheckoutSuggestion } from '@/lib/checkout';
 import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
-import { doc, onSnapshot, updateDoc, increment } from 'firebase/firestore';
-import { ArrowLeft, Target, Undo2 } from 'lucide-react';
+import { collection, doc, onSnapshot, updateDoc, increment, query, where, getDocs } from 'firebase/firestore';
+import { ArrowLeft, Target, Undo2, ChevronRight } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -25,14 +25,16 @@ export default function MatchPage() {
   const router = useRouter();
   
   const [match, setMatch] = useState<any>(null);
+  const [tournament, setTournament] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [currentDarts, setCurrentDarts] = useState<Dart[]>([]);
   const [multiplier, setMultiplier] = useState<Multiplier>('single');
+  const [nextMatchId, setNextMatchId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthReady || !user || !id || !matchId) return;
 
-    const unsub = onSnapshot(doc(db, 'tournaments', id, 'matches', matchId), (docSnap) => {
+    const unsubMatch = onSnapshot(doc(db, 'tournaments', id, 'matches', matchId), (docSnap) => {
       if (docSnap.exists()) {
         setMatch({ id: docSnap.id, ...docSnap.data() });
       } else {
@@ -40,8 +42,43 @@ export default function MatchPage() {
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, `tournaments/${id}/matches/${matchId}`));
 
-    return () => unsub();
+    const unsubTournament = onSnapshot(doc(db, 'tournaments', id), (docSnap) => {
+      if (docSnap.exists()) {
+        setTournament({ id: docSnap.id, ...docSnap.data() });
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, `tournaments/${id}`));
+
+    return () => {
+      unsubMatch();
+      unsubTournament();
+    };
   }, [id, matchId, user, isAuthReady, router]);
+
+  useEffect(() => {
+    if (!match || match.status !== 'completed') return;
+    
+    const findNextMatch = async () => {
+      try {
+        const matchesRef = collection(db, 'tournaments', id, 'matches');
+        const q = query(matchesRef, where('status', 'in', ['pending', 'in_progress']));
+        const snapshot = await getDocs(q);
+        const matches = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        
+        let next = matches.find(m => m.phase === match.phase);
+        if (!next) {
+          next = matches[0];
+        }
+        
+        if (next) {
+          setNextMatchId(next.id);
+        }
+      } catch (error) {
+        console.error("Error finding next match", error);
+      }
+    };
+    
+    findNextMatch();
+  }, [match?.status, id, match?.phase]);
 
   const setStarter = async (playerId: string) => {
     try {
@@ -89,10 +126,25 @@ export default function MatchPage() {
     let isBust = false;
     let isCheckout = false;
 
-    if (newRest < 0 || newRest === 1) {
+    const allowSingleOut = tournament?.allowSingleOut || false;
+    const allowDoubleOut = tournament?.allowDoubleOut !== false; // default true
+    const allowTripleOut = tournament?.allowTripleOut || false;
+
+    if (newRest < 0) {
+      isBust = true;
+    } else if (newRest === 1 && !allowSingleOut) {
       isBust = true;
     } else if (newRest === 0) {
-      if (mult === 'double') {
+      const isBull = baseValue === 25 && mult === 'single';
+      const isBullsEye = baseValue === 25 && mult === 'double';
+      
+      let validCheckout = false;
+
+      if (allowSingleOut && (mult === 'single' || isBull || isBullsEye)) validCheckout = true;
+      if (allowDoubleOut && (mult === 'double' || isBull || isBullsEye)) validCheckout = true;
+      if (allowTripleOut && (mult === 'triple' || isBull || isBullsEye)) validCheckout = true;
+
+      if (validCheckout) {
         isCheckout = true;
       } else {
         isBust = true;
@@ -146,33 +198,36 @@ export default function MatchPage() {
       }
     }
 
-    let matchEnded = false;
+    let legEnded = false;
     let winnerId = '';
     let isDraw = false;
 
     if (isCheckout) {
+      const isBestOfOne = match.format === '301_bo1';
+      const allowDraw = tournament?.allowDraw && isBestOfOne;
+
       if (match.answerThrowActive) {
-        matchEnded = true;
+        legEnded = true;
         isDraw = true;
       } else {
-        if (match.currentTurnId === (match.playerAStartsLeg ? match.playerAId : match.playerBId)) {
+        if (allowDraw && match.currentTurnId === (match.playerAStartsLeg ? match.playerAId : match.playerBId)) {
           updates.answerThrowActive = true;
           updates.currentTurnId = match.playerAStartsLeg ? match.playerBId : match.playerAId;
         } else {
-          matchEnded = true;
+          legEnded = true;
           winnerId = match.currentTurnId;
         }
       }
     } else {
       if (match.answerThrowActive) {
-        matchEnded = true;
+        legEnded = true;
         winnerId = match.playerAStartsLeg ? match.playerAId : match.playerBId;
       } else {
         updates.currentTurnId = isPlayerA ? match.playerBId : match.playerAId;
       }
     }
 
-    if (matchEnded) {
+    if (legEnded) {
       const isBo3 = match.format === '301_bo3' || match.format === '501_bo3';
       
       let newPlayerALegs = match.playerALegs || 0;
@@ -254,7 +309,7 @@ export default function MatchPage() {
 
   if (match.status === 'pending') {
     return (
-      <div className="min-h-screen bg-zinc-50 p-4 md:p-8 flex flex-col items-center justify-center">
+      <div className="flex-1 bg-zinc-50 p-4 md:p-8 flex flex-col items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center space-y-6">
             <h2 className="text-2xl font-bold">Who starts?</h2>
@@ -336,7 +391,7 @@ export default function MatchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-100 flex flex-col">
+    <div className="flex flex-col flex-1 h-[calc(100vh-theme(spacing.16))]">
       <div className="bg-slate-800 text-white p-2 flex items-center justify-between shadow-md">
         <Button variant="ghost" className="text-zinc-300 hover:text-white" onClick={() => router.push(`/tournament/${id}`)}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
@@ -348,10 +403,10 @@ export default function MatchPage() {
         <div className="w-20"></div>
       </div>
 
-      <div className="flex-1 max-w-3xl w-full mx-auto flex flex-col bg-white shadow-lg mt-4 rounded-t-lg overflow-hidden">
+      <div className="flex-1 w-full flex flex-col lg:flex-row bg-white shadow-lg mt-0 overflow-hidden">
         
         {/* Scoreboard */}
-        <div className="flex flex-col border-b-4 border-slate-800">
+        <div className="flex flex-col border-b-4 lg:border-b-0 lg:border-r-4 border-slate-800 flex-1">
           {renderPlayerRow(true)}
           {renderPlayerRow(false)}
         </div>
@@ -362,7 +417,14 @@ export default function MatchPage() {
             <p className="text-xl text-zinc-600 mb-6">
               {match.isDraw ? 'Draw (1:1 Points)' : `${match.winnerId === match.playerAId ? match.playerAName : match.playerBName} wins!`}
             </p>
-            <Button size="lg" onClick={() => router.push(`/tournament/${id}`)}>Return to Tournament</Button>
+            <div className="flex gap-4">
+              <Button size="lg" variant="outline" onClick={() => router.push(`/tournament/${id}`)}>Return to Tournament</Button>
+              {nextMatchId && (
+                <Button size="lg" onClick={() => router.push(`/tournament/${id}/match/${nextMatchId}`)}>
+                  Next Match <ChevronRight className="ml-2 w-5 h-5" />
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex-1 bg-zinc-200 p-2 flex flex-col">

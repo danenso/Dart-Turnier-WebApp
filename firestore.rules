@@ -30,9 +30,18 @@ service cloud.firestore {
       return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
     }
 
+    function isAdmin() {
+      return isAuthenticated() &&
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "hello@danenso.com" && request.auth.token.email_verified == true));
+    }
+
     // ===============================================================
     // Domain Validators
     // ===============================================================
+    function isValidUser(data) {
+      return hasRequiredFields(['role']) && data.role in ['admin', 'user'];
+    }
     function isValidGlobalPlayer(data) {
       return hasRequiredFields(['name', 'ownerId', 'createdAt']) &&
              isValidStringLength(data.name, 1, 50) &&
@@ -45,7 +54,11 @@ service cloud.firestore {
              isValidStringLength(data.title, 1, 100) &&
              data.status in ['draft', 'groups', 'tiebreaks', 'bracket', 'completed'] &&
              isValidDateString(data.createdAt) &&
-             data.ownerId == request.auth.uid;
+             data.ownerId == request.auth.uid &&
+             (!('allowSingleOut' in data) || data.allowSingleOut is bool) &&
+             (!('allowDoubleOut' in data) || data.allowDoubleOut is bool) &&
+             (!('allowTripleOut' in data) || data.allowTripleOut is bool) &&
+             (!('allowDraw' in data) || data.allowDraw is bool);
     }
 
     function isValidPlayer(data) {
