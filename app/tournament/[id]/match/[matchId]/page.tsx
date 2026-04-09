@@ -92,7 +92,7 @@ export default function MatchPage() {
     if (newRest < 0 || newRest === 1) {
       isBust = true;
     } else if (newRest === 0) {
-      if (mult === 'double' || (baseValue === 25 && mult === 'double')) {
+      if (mult === 'double') {
         isCheckout = true;
       } else {
         isBust = true;

@@ -1,10 +1,10 @@
 {
-  "projectId": "shg-gleisbau",
-  "appId": "1:741056121755:web:f075076bdf72cc045baf3e",
-  "apiKey": "AIzaSyCGyGpHBngqSnXqHWstXgIcgo-WuDiOCJw",
-  "authDomain": "shg-gleisbau.firebaseapp.com",
+  "projectId": "gen-lang-client-0517497985",
+  "appId": "1:897153620589:web:a92100c15415bbd0ea7d64",
+  "apiKey": "AIzaSyCATjlmqQaDEu1_EU1Yyrh7Ha2ZZ0cql_o",
+  "authDomain": "gen-lang-client-0517497985.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-4640c197-7769-4341-aad5-373fac0e1266",
-  "storageBucket": "shg-gleisbau.firebasestorage.app",
-  "messagingSenderId": "741056121755",
+  "storageBucket": "gen-lang-client-0517497985.firebasestorage.app",
+  "messagingSenderId": "897153620589",
   "measurementId": ""
 }
