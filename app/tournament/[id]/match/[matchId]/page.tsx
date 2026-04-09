@@ -250,16 +250,39 @@ export default function MatchPage() {
           try {
             const pARef = doc(db, 'tournaments', id, 'players', match.playerAId);
             const pBRef = doc(db, 'tournaments', id, 'players', match.playerBId);
+            const globalPARef = doc(db, 'players', match.playerAId);
+            const globalPBRef = doc(db, 'players', match.playerBId);
             
             if (isDraw) {
               await updateDoc(pARef, { points: increment(1), matchesPlayed: increment(1), draws: increment(1) });
               await updateDoc(pBRef, { points: increment(1), matchesPlayed: increment(1), draws: increment(1) });
+              await updateDoc(globalPARef, { matchesPlayed: increment(1), draws: increment(1) });
+              await updateDoc(globalPBRef, { matchesPlayed: increment(1), draws: increment(1) });
             } else if (updates.winnerId === match.playerAId) {
               await updateDoc(pARef, { points: increment(2), matchesPlayed: increment(1), wins: increment(1) });
               await updateDoc(pBRef, { matchesPlayed: increment(1), losses: increment(1) });
+              await updateDoc(globalPARef, { matchesPlayed: increment(1), wins: increment(1) });
+              await updateDoc(globalPBRef, { matchesPlayed: increment(1), losses: increment(1) });
             } else {
               await updateDoc(pBRef, { points: increment(2), matchesPlayed: increment(1), wins: increment(1) });
               await updateDoc(pARef, { matchesPlayed: increment(1), losses: increment(1) });
+              await updateDoc(globalPBRef, { matchesPlayed: increment(1), wins: increment(1) });
+              await updateDoc(globalPARef, { matchesPlayed: increment(1), losses: increment(1) });
+            }
+          } catch (error) {
+            console.error("Error updating player stats", error);
+          }
+        } else {
+          try {
+            const globalPARef = doc(db, 'players', match.playerAId);
+            const globalPBRef = doc(db, 'players', match.playerBId);
+            
+            if (updates.winnerId === match.playerAId) {
+              await updateDoc(globalPARef, { matchesPlayed: increment(1), wins: increment(1) });
+              await updateDoc(globalPBRef, { matchesPlayed: increment(1), losses: increment(1) });
+            } else {
+              await updateDoc(globalPBRef, { matchesPlayed: increment(1), wins: increment(1) });
+              await updateDoc(globalPARef, { matchesPlayed: increment(1), losses: increment(1) });
             }
           } catch (error) {
             console.error("Error updating player stats", error);
@@ -296,9 +319,13 @@ export default function MatchPage() {
       setMultiplier('single');
     } else if (history.length > 0) {
       const lastState = history[history.length - 1];
+      const lastTurn = match.turns && match.turns.length > 0 ? match.turns[match.turns.length - 1] : null;
       try {
         await updateDoc(doc(db, 'tournaments', id, 'matches', matchId), lastState);
         setHistory(history.slice(0, -1));
+        if (lastTurn && lastTurn.darts && lastTurn.darts.length > 0) {
+          setCurrentDarts(lastTurn.darts.slice(0, -1));
+        }
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `tournaments/${id}/matches/${matchId}`);
       }

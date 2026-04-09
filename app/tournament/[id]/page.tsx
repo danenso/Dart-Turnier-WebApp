@@ -12,9 +12,11 @@ import { ArrowLeft, Trash2, Users } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+
 export default function TournamentPage() {
   const { id } = useParams() as { id: string };
-  const { user, isAuthReady } = useFirebase();
+  const { user, isAuthReady, isAdmin } = useFirebase();
   const router = useRouter();
   
   const [tournament, setTournament] = useState<any>(null);
@@ -22,6 +24,7 @@ export default function TournamentPage() {
   const [matches, setMatches] = useState<any[]>([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [globalPlayers, setGlobalPlayers] = useState<any[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthReady || !user || !id) return;
@@ -309,6 +312,16 @@ export default function TournamentPage() {
     }
   };
 
+  const deleteTournament = async () => {
+    if (!isAdmin) return;
+    try {
+      await deleteDoc(doc(db, 'tournaments', id));
+      router.push('/');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `tournaments/${id}`);
+    }
+  };
+
   if (!tournament) return <div className="p-8">Loading...</div>;
 
   return (
@@ -318,16 +331,23 @@ export default function TournamentPage() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
         </Button>
         
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{tournament.title}</h1>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 text-zinc-900">
-              {tournament.status.toUpperCase()}
-            </span>
-            <span className="text-sm text-zinc-500 flex items-center gap-1">
-              <Users className="h-4 w-4" /> {players.length} Players
-            </span>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{tournament.title}</h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 text-zinc-900">
+                {tournament.status.toUpperCase()}
+              </span>
+              <span className="text-sm text-zinc-500 flex items-center gap-1">
+                <Users className="h-4 w-4" /> {players.length} Players
+              </span>
+            </div>
           </div>
+          {isAdmin && (
+            <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
+              <Trash2 className="w-4 h-4 mr-2" /> Delete Tournament
+            </Button>
+          )}
         </div>
 
         <Tabs defaultValue="participants" className="w-full">
@@ -652,6 +672,21 @@ export default function TournamentPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Tournament</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this tournament? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+              <Button variant="destructive" onClick={deleteTournament}>Delete</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

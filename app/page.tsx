@@ -14,12 +14,18 @@ import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
 
 export default function Home() {
-  const { user, isAuthReady, signIn } = useFirebase();
+  const { user, isAuthReady, signIn, signInWithEmail } = useFirebase();
   const router = useRouter();
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
+  // Login state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   // Form state
   const [title, setTitle] = useState('');
   const [allowSingleOut, setAllowSingleOut] = useState(false);
@@ -46,6 +52,19 @@ export default function Home() {
 
     return () => unsubscribe();
   }, [user, isAuthReady]);
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    setIsLoggingIn(true);
+    try {
+      await signInWithEmail(loginEmail, loginPassword);
+    } catch (error: any) {
+      setLoginError(error.message || 'Failed to sign in');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   const createTournament = async () => {
     if (!user || !title.trim()) return;
@@ -83,8 +102,32 @@ export default function Home() {
             <CardTitle className="text-2xl font-bold">Dart Tournament Manager</CardTitle>
             <CardDescription>Sign in to organize and manage your dart events.</CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center">
-            <Button onClick={signIn} size="lg" className="w-full">Sign in with Google</Button>
+          <CardContent className="space-y-6">
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Password</Label>
+                <Input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
+              </div>
+              {loginError && <p className="text-sm text-red-500">{loginError}</p>}
+              <Button type="submit" className="w-full" disabled={isLoggingIn}>
+                {isLoggingIn ? 'Signing in...' : 'Sign in with Email'}
+              </Button>
+            </form>
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+
+            <Button onClick={signIn} variant="outline" className="w-full">Sign in with Google</Button>
           </CardContent>
         </Card>
       </div>
