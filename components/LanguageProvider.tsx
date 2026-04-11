@@ -62,8 +62,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedLang = localStorage.getItem("app-language") as Language;
     if (savedLang && (savedLang === "en" || savedLang === "de")) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLanguageState(savedLang);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -75,11 +77,6 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const t = (key: string) => {
     return translations[language][key] || key;
   };
-
-  // Prevent hydration mismatch by not rendering until mounted
-  if (!mounted) {
-    return <>{children}</>;
-  }
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t }}>

@@ -49,7 +49,7 @@ export default function PlayersPage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-lg leading-tight">{player.name}</h3>
-                    {player.nickname && <p className="text-sm text-zinc-500">"{player.nickname}"</p>}
+                    {player.nickname && <p className="text-sm text-zinc-500">&quot;{player.nickname}&quot;</p>}
                   </div>
                 </div>
                 

@@ -27,7 +27,8 @@
       "type": "object",
       "properties": {
         "title": { "type": "string" },
-        "status": { "type": "string", "enum": ["draft", "groups", "tiebreaks", "bracket", "completed"] },
+        "status": { "type": "string", "enum": ["draft", "groups", "tiebreaks", "bracket", "completed", "single_match"] },
+        "type": { "type": "string" },
         "allowSingleOut": { "type": "boolean" },
         "allowDoubleOut": { "type": "boolean" },
         "allowTripleOut": { "type": "boolean" },
@@ -75,7 +76,7 @@
         "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] },
         "winnerId": { "type": "string" },
         "isDraw": { "type": "boolean" },
-        "format": { "type": "string", "enum": ["301_bo1", "301_bo3", "501_bo3"] }
+        "format": { "type": "string" }
       },
       "required": ["phase", "playerAId", "playerBId", "status", "format"]
     },

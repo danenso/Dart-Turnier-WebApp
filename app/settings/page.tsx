@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -43,7 +44,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
               <div className="flex flex-col space-y-2">
                 <Label htmlFor="theme">{t('settings.theme')}</Label>
-                <Select value={theme} onValueChange={setTheme}>
+                <Select value={theme} onValueChange={(val) => val && setTheme(val)}>
                   <SelectTrigger id="theme" className="w-[200px]">
                     <SelectValue placeholder={t('settings.theme')} />
                   </SelectTrigger>

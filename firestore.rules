@@ -57,13 +57,14 @@ service cloud.firestore {
     function isValidTournament(data) {
       return hasRequiredFields(['title', 'status', 'createdAt', 'ownerId']) &&
              isValidStringLength(data.title, 1, 100) &&
-             data.status in ['draft', 'groups', 'tiebreaks', 'bracket', 'completed'] &&
+             data.status in ['draft', 'groups', 'tiebreaks', 'bracket', 'completed', 'single_match'] &&
              isValidDateString(data.createdAt) &&
              data.ownerId == request.auth.uid &&
              (!('allowSingleOut' in data) || data.allowSingleOut is bool) &&
              (!('allowDoubleOut' in data) || data.allowDoubleOut is bool) &&
              (!('allowTripleOut' in data) || data.allowTripleOut is bool) &&
-             (!('allowDraw' in data) || data.allowDraw is bool);
+             (!('allowDraw' in data) || data.allowDraw is bool) &&
+             (!('type' in data) || data.type is string);
     }
 
     function isValidPlayer(data) {
@@ -84,7 +85,7 @@ service cloud.firestore {
              data.phase in ['group', 'quarter', 'semi', 'final'] &&
              data.playerAId is string && data.playerBId is string &&
              data.status in ['pending', 'in_progress', 'completed'] &&
-             data.format in ['301_bo1', '301_bo3', '501_bo3'] &&
+             data.format is string && data.format.matches("^(301|501)_bo[135]$") &&
              (!('playerAName' in data) || data.playerAName is string) &&
              (!('playerBName' in data) || data.playerBName is string) &&
              (!('playerALegs' in data) || data.playerALegs is number) &&

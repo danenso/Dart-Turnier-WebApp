@@ -57,7 +57,7 @@ export default function AccountPage() {
               </div>
               <div>
                 <h3 className="text-2xl font-bold">{playerProfile.name}</h3>
-                {playerProfile.nickname && <p className="text-lg text-zinc-500">"{playerProfile.nickname}"</p>}
+                {playerProfile.nickname && <p className="text-lg text-zinc-500">&quot;{playerProfile.nickname}&quot;</p>}
               </div>
             </div>
 

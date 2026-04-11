@@ -28,6 +28,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const topNav = [
     { name: t('nav.tournaments') || "Tournaments", href: "/", icon: Trophy },
+    { name: t('nav.casual') || "Freies Spiel", href: "/casual", icon: Target },
     { name: t('nav.players') || "Players", href: "/players", icon: Users },
     { name: t('nav.standings') || "Standings", href: "/standings", icon: BarChart3 },
   ];
