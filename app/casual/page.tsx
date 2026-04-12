@@ -17,7 +17,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Target } from "lucide-react";
+import { Radius } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -221,7 +221,8 @@ export default function CasualGamesPage() {
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <Radius className="w-8 h-8" />
               Freies Spiel
             </h1>
             <p className="text-zinc-500">

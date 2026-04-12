@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Target } from "lucide-react";
+import { Radius } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -154,7 +154,7 @@ export default function Home() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-zinc-900 text-white rounded-full flex items-center justify-center mb-4">
-              <Target size={24} />
+              <Radius size={24} />
             </div>
             <CardTitle className="text-2xl font-bold">
               Dart Tournament Manager

@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { useFirebase } from "@/components/FirebaseProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,7 @@ import {
 } from "firebase/firestore";
 import { ArrowLeft, Trash2, Users } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { TiebreakManager } from "@/components/TiebreakManager";
 
 import {
@@ -44,6 +45,34 @@ export default function TournamentPage() {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [globalPlayers, setGlobalPlayers] = useState<any[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setScrollLeft(scrollRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 2;
+    scrollRef.current.scrollLeft = scrollLeft - walk;
+  };
 
   useEffect(() => {
     if (!isAuthReady || !user || !id) return;
@@ -625,51 +654,106 @@ export default function TournamentPage() {
         </div>
 
         <Tabs defaultValue="participants" className="w-full">
-          <TabsList className="flex flex-wrap w-full justify-start gap-2 h-auto bg-transparent p-0">
-            <TabsTrigger 
-              value="participants"
-              className="flex-none rounded-full px-4 py-2 bg-zinc-100 dark:bg-zinc-800/50 shadow-none data-active:bg-zinc-900 data-active:text-white dark:data-active:bg-zinc-100 dark:data-active:text-zinc-900 after:hidden"
-            >
-              Participants
-            </TabsTrigger>
-            <TabsTrigger
-              value="groups"
-              disabled={tournament.status === "draft"}
-              className="flex-none rounded-full px-4 py-2 bg-zinc-100 dark:bg-zinc-800/50 shadow-none data-active:bg-zinc-900 data-active:text-white dark:data-active:bg-zinc-100 dark:data-active:text-zinc-900 after:hidden"
-            >
-              Groups
-            </TabsTrigger>
-            <TabsTrigger
-              value="matches"
-              disabled={tournament.status === "draft"}
-              className="flex-none rounded-full px-4 py-2 bg-zinc-100 dark:bg-zinc-800/50 shadow-none data-active:bg-zinc-900 data-active:text-white dark:data-active:bg-zinc-100 dark:data-active:text-zinc-900 after:hidden"
-            >
-              Matches
-            </TabsTrigger>
-            <TabsTrigger
-              value="tiebreaks"
-              disabled={tournament.status !== "tiebreaks"}
-              className="flex-none rounded-full px-4 py-2 bg-zinc-100 dark:bg-zinc-800/50 shadow-none data-active:bg-zinc-900 data-active:text-white dark:data-active:bg-zinc-100 dark:data-active:text-zinc-900 after:hidden"
-            >
-              Tiebreaks
-            </TabsTrigger>
-            <TabsTrigger
-              value="bracket"
-              disabled={["draft", "groups", "tiebreaks"].includes(
-                tournament.status,
+          <div className="relative mb-0 h-[45px]">
+            <TabsList 
+              ref={scrollRef}
+              onMouseDown={handleMouseDown}
+              onMouseLeave={handleMouseLeave}
+              onMouseUp={handleMouseUp}
+              onMouseMove={handleMouseMove}
+              className={cn(
+                "flex w-full overflow-x-auto justify-start gap-3 h-[46px] bg-transparent p-2 pb-2 select-none",
+                "cursor-grab active:cursor-grabbing",
+                "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
               )}
-              className="flex-none rounded-full px-4 py-2 bg-zinc-100 dark:bg-zinc-800/50 shadow-none data-active:bg-zinc-900 data-active:text-white dark:data-active:bg-zinc-100 dark:data-active:text-zinc-900 after:hidden"
             >
-              Finals
-            </TabsTrigger>
-            <TabsTrigger
-              value="results"
-              disabled={tournament.status !== "completed"}
-              className="flex-none rounded-full px-4 py-2 bg-zinc-100 dark:bg-zinc-800/50 shadow-none data-active:bg-zinc-900 data-active:text-white dark:data-active:bg-zinc-100 dark:data-active:text-zinc-900 after:hidden"
-            >
-              Results
-            </TabsTrigger>
-          </TabsList>
+              <TabsTrigger 
+                value="participants"
+                className={cn(
+                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
+                  "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
+                  "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
+                  "dark:data-[state=active]:bg-zinc-100 dark:data-[state=active]:text-zinc-900 dark:data-[state=active]:border-zinc-100",
+                  "shadow-sm after:hidden"
+                )}
+              >
+                Participants
+              </TabsTrigger>
+              <TabsTrigger
+                value="groups"
+                disabled={tournament.status === "draft"}
+                className={cn(
+                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
+                  "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
+                  "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
+                  "dark:data-[state=active]:bg-zinc-100 dark:data-[state=active]:text-zinc-900 dark:data-[state=active]:border-zinc-100",
+                  "shadow-sm after:hidden"
+                )}
+              >
+                Groups
+              </TabsTrigger>
+              <TabsTrigger
+                value="matches"
+                disabled={tournament.status === "draft"}
+                className={cn(
+                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
+                  "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
+                  "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
+                  "dark:data-[state=active]:bg-zinc-100 dark:data-[state=active]:text-zinc-900 dark:data-[state=active]:border-zinc-100",
+                  "shadow-sm after:hidden"
+                )}
+              >
+                Matches
+              </TabsTrigger>
+              <TabsTrigger
+                value="tiebreaks"
+                disabled={tournament.status !== "tiebreaks"}
+                className={cn(
+                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
+                  "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
+                  "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
+                  "dark:data-[state=active]:bg-zinc-100 dark:data-[state=active]:text-zinc-900 dark:data-[state=active]:border-zinc-100",
+                  "shadow-sm after:hidden"
+                )}
+              >
+                Tiebreaks
+              </TabsTrigger>
+              <TabsTrigger
+                value="bracket"
+                disabled={["draft", "groups", "tiebreaks"].includes(
+                  tournament.status,
+                )}
+                className={cn(
+                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
+                  "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
+                  "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
+                  "dark:data-[state=active]:bg-zinc-100 dark:data-[state=active]:text-zinc-900 dark:data-[state=active]:border-zinc-100",
+                  "shadow-sm after:hidden"
+                )}
+              >
+                Finals
+              </TabsTrigger>
+              <TabsTrigger
+                value="results"
+                disabled={tournament.status !== "completed"}
+                className={cn(
+                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
+                  "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
+                  "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
+                  "dark:data-[state=active]:bg-zinc-100 dark:data-[state=active]:text-zinc-900 dark:data-[state=active]:border-zinc-100",
+                  "shadow-sm after:hidden"
+                )}
+              >
+                Results
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="participants" className="mt-6">
             <div className="grid md:grid-cols-3 gap-6">

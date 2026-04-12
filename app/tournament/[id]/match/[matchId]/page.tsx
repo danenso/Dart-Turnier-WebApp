@@ -16,7 +16,7 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-import { ArrowLeft, Target, Undo2, ChevronRight } from "lucide-react";
+import { ArrowLeft, Radius, Undo2, ChevronRight } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -555,7 +555,7 @@ export default function MatchPage() {
         <div className="flex-1 p-4 flex flex-col justify-center border-r">
           <div className="flex justify-between items-center mb-1">
             <span className="text-sm text-zinc-500 flex items-center gap-1">
-              <Target className="w-3 h-3" />{" "}
+              <Radius className="w-3 h-3" />{" "}
               {dartsThrown + (isActive ? currentDarts.length : 0)}
             </span>
           </div>

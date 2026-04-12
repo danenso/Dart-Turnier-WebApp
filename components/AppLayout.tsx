@@ -2,7 +2,7 @@
 
 import { useFirebase } from "@/components/FirebaseProvider";
 import { useLanguage } from "@/components/LanguageProvider";
-import { Trophy, Users, BarChart3, Settings, User, LogOut, Target, ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { Trophy, Users, BarChart3, Settings, User, LogOut, Radius, ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -27,10 +27,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const topNav = [
-    { name: t('nav.tournaments') || "Tournaments", href: "/", icon: Trophy },
-    { name: t('nav.casual') || "Freies Spiel", href: "/casual", icon: Target },
-    { name: t('nav.players') || "Players", href: "/players", icon: Users },
-    { name: t('nav.standings') || "Standings", href: "/standings", icon: BarChart3 },
+    { name: t('nav.tournaments'), href: "/", icon: Trophy },
+    { name: t('nav.casual'), href: "/casual", icon: Radius },
+    { name: t('nav.players'), href: "/players", icon: Users },
+    { name: t('nav.standings'), href: "/standings", icon: BarChart3 },
   ];
 
   const bottomNav = [
@@ -51,11 +51,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className={cn("p-6 flex items-center", isCollapsed ? "justify-center px-0" : "justify-between")}>
             {!isCollapsed && (
               <h2 className="text-xl font-bold tracking-tight flex items-center gap-2 truncate text-zinc-900 dark:text-zinc-50">
-                <Target className="w-6 h-6 text-zinc-900 dark:text-zinc-50 shrink-0" />
+                <Radius className="w-6 h-6 text-zinc-900 dark:text-zinc-50 shrink-0" />
                 Darts Manager
               </h2>
             )}
-            {isCollapsed && <Target className="w-8 h-8 text-zinc-900 dark:text-zinc-50 shrink-0" />}
+            {isCollapsed && <Radius className="w-8 h-8 text-zinc-900 dark:text-zinc-50 shrink-0" />}
           </div>
 
           <Button 
