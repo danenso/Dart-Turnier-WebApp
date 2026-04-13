@@ -8,8 +8,11 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Allow access to remote image placeholder.
+  // Static export for Hostinger Cloud Web Hosting
+  output: 'export',
+  // Images must be unoptimized for static export (Firebase URLs handled client-side)
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -31,7 +34,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: 'standalone',
   transpilePackages: ['motion'],
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
