@@ -19,7 +19,7 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import { ArrowLeft, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Trash2, Users, ClipboardList } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { TiebreakManager } from "@/components/TiebreakManager";
@@ -45,6 +45,13 @@ export default function TournamentPage() {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [globalPlayers, setGlobalPlayers] = useState<any[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  // Retroaktive Ergebniseingabe
+  const [isRetroDialogOpen, setIsRetroDialogOpen] = useState(false);
+  const [retroPoints, setRetroPoints] = useState<Record<string, string>>({});
+  const [retroWins, setRetroWins] = useState<Record<string, string>>({});
+  const [retroLosses, setRetroLosses] = useState<Record<string, string>>({});
+  const [retroDraws, setRetroDraws] = useState<Record<string, string>>({});
+  const [isSavingRetro, setIsSavingRetro] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -530,6 +537,65 @@ export default function TournamentPage() {
     }
   };
 
+  const openRetroDialog = () => {
+    // Vorbelegen mit 0
+    const pts: Record<string, string> = {};
+    const w: Record<string, string> = {};
+    const l: Record<string, string> = {};
+    const d: Record<string, string> = {};
+    players.forEach((p) => {
+      pts[p.id] = String(p.points ?? 0);
+      w[p.id] = String(p.wins ?? 0);
+      l[p.id] = String(p.losses ?? 0);
+      d[p.id] = String(p.draws ?? 0);
+    });
+    setRetroPoints(pts);
+    setRetroWins(w);
+    setRetroLosses(l);
+    setRetroDraws(d);
+    setIsRetroDialogOpen(true);
+  };
+
+  const saveRetroResults = async () => {
+    if (!user) return;
+    setIsSavingRetro(true);
+    try {
+      for (const p of players) {
+        const pts = Math.max(0, parseInt(retroPoints[p.id] ?? "0", 10) || 0);
+        const w = Math.max(0, parseInt(retroWins[p.id] ?? "0", 10) || 0);
+        const l = Math.max(0, parseInt(retroLosses[p.id] ?? "0", 10) || 0);
+        const dr = Math.max(0, parseInt(retroDraws[p.id] ?? "0", 10) || 0);
+        await setDoc(doc(db, "tournaments", id, "players", p.id), {
+          name: p.name,
+          points: pts,
+          matchesPlayed: w + l + dr,
+          wins: w,
+          draws: dr,
+          losses: l,
+        });
+      }
+      await updateDoc(doc(db, "tournaments", id), {
+        title: tournament.title,
+        status: "completed",
+        allowSingleOut: tournament.allowSingleOut ?? false,
+        allowDoubleOut: tournament.allowDoubleOut ?? true,
+        allowTripleOut: tournament.allowTripleOut ?? false,
+        allowDraw: tournament.allowDraw ?? false,
+        createdAt: tournament.createdAt,
+        ownerId: tournament.ownerId,
+        ...(tournament.seasonId ? { seasonId: tournament.seasonId } : {}),
+        ...(tournament.tournamentNumber !== undefined ? { tournamentNumber: tournament.tournamentNumber } : {}),
+        ...(tournament.isFinalTournament ? { isFinalTournament: true } : {}),
+        ...(tournament.isRetroactive ? { isRetroactive: true } : {}),
+      });
+      setIsRetroDialogOpen(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `tournaments/${id}`);
+    } finally {
+      setIsSavingRetro(false);
+    }
+  };
+
   const deleteTournament = async () => {
     if (!isAdmin) return;
     try {
@@ -593,10 +659,9 @@ export default function TournamentPage() {
           >
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Delete Tiebreak?</DialogTitle>
+                <DialogTitle>Tiebreak löschen?</DialogTitle>
                 <DialogDescription>
-                  This action cannot be undone. This will permanently delete the
-                  tiebreak.
+                  Diese Aktion kann nicht rückgängig gemacht werden.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -633,12 +698,27 @@ export default function TournamentPage() {
             <h1 className="text-3xl font-bold tracking-tight">
               {tournament.title}
             </h1>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex flex-wrap items-center gap-2 mt-2">
               <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 text-zinc-900">
                 {tournament.status.toUpperCase()}
               </span>
+              {tournament.isRetroactive && (
+                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-orange-100 text-orange-700">
+                  Retroaktiv
+                </span>
+              )}
+              {tournament.isFinalTournament && (
+                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-yellow-100 text-yellow-800">
+                  Final
+                </span>
+              )}
+              {tournament.tournamentNumber && !tournament.isFinalTournament && (
+                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800">
+                  #{tournament.tournamentNumber}
+                </span>
+              )}
               <span className="text-sm text-zinc-500 flex items-center gap-1">
-                <Users className="h-4 w-4" /> {players.length} Players
+                <Users className="h-4 w-4" /> {players.length} Spieler
               </span>
             </div>
           </div>
@@ -790,11 +870,22 @@ export default function TournamentPage() {
 
               <Card className="md:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Player List</CardTitle>
+                  <CardTitle>Spielerliste</CardTitle>
                   {tournament.status === "draft" && (
-                    <Button onClick={startDraw} disabled={players.length < 4}>
-                      Start Draw & Generate Matches
-                    </Button>
+                    tournament.isRetroactive ? (
+                      <Button
+                        onClick={openRetroDialog}
+                        disabled={players.length === 0}
+                        className="bg-orange-600 hover:bg-orange-700"
+                      >
+                        <ClipboardList className="w-4 h-4 mr-2" />
+                        Ergebnisse eintragen
+                      </Button>
+                    ) : (
+                      <Button onClick={startDraw} disabled={players.length < 4}>
+                        Auslosung starten
+                      </Button>
+                    )
                   )}
                 </CardHeader>
                 <CardContent>
@@ -1292,13 +1383,127 @@ export default function TournamentPage() {
           </TabsContent>
         </Tabs>
 
+        {/* Retroaktive Ergebniseingabe Dialog */}
+        <Dialog open={isRetroDialogOpen} onOpenChange={setIsRetroDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Ergebnisse eintragen – {tournament.title}</DialogTitle>
+              <DialogDescription>
+                Gib für jeden Spieler die Punkte aus der Gruppenphase ein.
+                Win = 2 Pkt, Unentschieden = 1 Pkt, Niederlage = 0 Pkt.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-xs text-zinc-500 uppercase bg-zinc-50 dark:bg-zinc-800/50">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Spieler</th>
+                      <th className="px-3 py-2 text-center">S (Siege)</th>
+                      <th className="px-3 py-2 text-center">U (Unentsch.)</th>
+                      <th className="px-3 py-2 text-center">N (Niederl.)</th>
+                      <th className="px-3 py-2 text-center font-bold">Punkte</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...players]
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((p) => (
+                        <tr key={p.id} className="border-b dark:border-zinc-800">
+                          <td className="px-3 py-2 font-medium">{p.name}</td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              value={retroWins[p.id] ?? "0"}
+                              onChange={(e) => {
+                                const w = e.target.value;
+                                setRetroWins((prev) => ({ ...prev, [p.id]: w }));
+                                const wn = parseInt(w, 10) || 0;
+                                const dr = parseInt(retroDraws[p.id] ?? "0", 10) || 0;
+                                setRetroPoints((prev) => ({ ...prev, [p.id]: String(wn * 2 + dr) }));
+                              }}
+                              className="w-16 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-center bg-white dark:bg-zinc-900"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              value={retroDraws[p.id] ?? "0"}
+                              onChange={(e) => {
+                                const dr = e.target.value;
+                                setRetroDraws((prev) => ({ ...prev, [p.id]: dr }));
+                                const drn = parseInt(dr, 10) || 0;
+                                const wn = parseInt(retroWins[p.id] ?? "0", 10) || 0;
+                                setRetroPoints((prev) => ({ ...prev, [p.id]: String(wn * 2 + drn) }));
+                              }}
+                              className="w-16 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-center bg-white dark:bg-zinc-900"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              value={retroLosses[p.id] ?? "0"}
+                              onChange={(e) =>
+                                setRetroLosses((prev) => ({
+                                  ...prev,
+                                  [p.id]: e.target.value,
+                                }))
+                              }
+                              className="w-16 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-center bg-white dark:bg-zinc-900"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="number"
+                              min={0}
+                              value={retroPoints[p.id] ?? "0"}
+                              onChange={(e) =>
+                                setRetroPoints((prev) => ({
+                                  ...prev,
+                                  [p.id]: e.target.value,
+                                }))
+                              }
+                              className="w-16 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-center font-bold bg-white dark:bg-zinc-900"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-zinc-400 mt-3">
+                Tipp: S und U füllen die Punkte automatisch aus (S×2 + U×1).
+                Du kannst Punkte auch direkt überschreiben.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsRetroDialogOpen(false)}
+              >
+                Abbrechen
+              </Button>
+              <Button
+                onClick={saveRetroResults}
+                disabled={isSavingRetro}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                {isSavingRetro ? "Speichern..." : "Turnier abschließen"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Delete Tournament</DialogTitle>
+              <DialogTitle>Turnier löschen</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete this tournament? This action
-                cannot be undone.
+                Möchtest du dieses Turnier wirklich löschen? Diese Aktion
+                kann nicht rückgängig gemacht werden.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -1306,10 +1511,10 @@ export default function TournamentPage() {
                 variant="outline"
                 onClick={() => setIsDeleteDialogOpen(false)}
               >
-                Cancel
+                Abbrechen
               </Button>
               <Button variant="destructive" onClick={deleteTournament}>
-                Delete
+                Löschen
               </Button>
             </DialogFooter>
           </DialogContent>

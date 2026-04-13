@@ -2,9 +2,11 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { FirebaseProvider } from '@/components/FirebaseProvider';
+import { AudioProvider } from '@/components/AudioProvider';
 import { AppLayout } from '@/components/AppLayout';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { LanguageProvider } from '@/components/LanguageProvider';
+import { ThemeCustomizerProvider } from '@/components/ThemeCustomizerProvider';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -20,15 +22,19 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
     <html lang="en" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
       <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <LanguageProvider>
-            <ErrorBoundary>
-              <FirebaseProvider>
-                <AppLayout>
-                  {children}
-                </AppLayout>
-              </FirebaseProvider>
-            </ErrorBoundary>
-          </LanguageProvider>
+          <ThemeCustomizerProvider>
+            <LanguageProvider>
+              <ErrorBoundary>
+                <FirebaseProvider>
+                  <AudioProvider>
+                    <AppLayout>
+                      {children}
+                    </AppLayout>
+                  </AudioProvider>
+                </FirebaseProvider>
+              </ErrorBoundary>
+            </LanguageProvider>
+          </ThemeCustomizerProvider>
         </ThemeProvider>
       </body>
     </html>

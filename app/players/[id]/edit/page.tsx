@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { db, secondaryAuth } from "@/lib/firebase";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-errors";
+import { processAvatarToBase64, AvatarUploadError } from "@/lib/avatar-upload";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -16,14 +17,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { uploadSong, SongUploadError } from "@/lib/song-upload";
+import { ArrowLeft, Trash2, Upload, User, Music2, X, Shield } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function PlayerEditPage() {
   const { id } = useParams() as { id: string };
-  const { user, isAuthReady, isAdmin } = useFirebase();
+  const { user, isAuthReady, isAdmin, isSuperAdmin } = useFirebase();
   const router = useRouter();
 
   const [player, setPlayer] = useState<any>(null);
@@ -32,8 +34,24 @@ export default function PlayerEditPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [avatar, setAvatar] = useState("");
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarError, setAvatarError] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isPlayerAdmin, setIsPlayerAdmin] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Song state
+  const [songUrl, setSongUrl] = useState("");
+  const [songTitle, setSongTitle] = useState("");
+  const [songArtist, setSongArtist] = useState("");
+  const [songFile, setSongFile] = useState<File | null>(null);
+  const [songFileName, setSongFileName] = useState("");
+  const [songError, setSongError] = useState("");
+  const [isUploadingSong, setIsUploadingSong] = useState(false);
+  const songInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isAuthReady || !user) return;
@@ -53,6 +71,15 @@ export default function PlayerEditPage() {
           setNickname(data.nickname || "");
           setEmail(data.email || "");
           setAvatar(data.avatar || "");
+          setSongUrl(data.songUrl || "");
+          setSongTitle(data.songTitle || "");
+          setSongArtist(data.songArtist || "");
+
+          // Admin-Status laden falls authUid vorhanden
+          if (data.authUid && isSuperAdmin) {
+            const userDoc = await getDoc(doc(db, "users", data.authUid));
+            setIsPlayerAdmin(userDoc.exists() && userDoc.data().role === "admin");
+          }
         } else {
           router.push("/players");
         }
@@ -64,12 +91,49 @@ export default function PlayerEditPage() {
     fetchPlayer();
   }, [id, user, isAuthReady, isAdmin, router]);
 
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarError("");
+
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("Bild zu groß. Maximal 5 MB erlaubt.");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Nur Bilddateien sind erlaubt.");
+      return;
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
   const handleSave = async () => {
     if (!player) return;
     setIsSaving(true);
 
     try {
       let authUid = player.authUid;
+      let finalAvatar = avatar;
+
+      // Avatar verarbeiten falls eine neue Datei ausgewählt wurde
+      if (avatarFile) {
+        setIsProcessing(true);
+        try {
+          finalAvatar = await processAvatarToBase64(avatarFile);
+        } catch (err) {
+          const msg = err instanceof AvatarUploadError
+            ? err.message
+            : `Verarbeitung fehlgeschlagen: ${(err as Error).message ?? "Unbekannter Fehler"}`;
+          setAvatarError(msg);
+          setIsSaving(false);
+          setIsProcessing(false);
+          return;
+        } finally {
+          setIsProcessing(false);
+        }
+      }
 
       // If email and password are provided and no authUid exists, create a user
       if (email && password && !authUid && isAdmin) {
@@ -81,20 +145,101 @@ export default function PlayerEditPage() {
         authUid = userCredential.user.uid;
       }
 
+      // Song hochladen falls neue Datei ausgewählt
+      let finalSongUrl = songUrl;
+      if (songFile) {
+        setIsUploadingSong(true);
+        try {
+          finalSongUrl = await uploadSong(songFile, player.id, player.songUrl);
+        } catch (err) {
+          const msg = err instanceof SongUploadError
+            ? err.message
+            : `Song-Upload fehlgeschlagen: ${(err as Error).message ?? "Unbekannter Fehler"}`;
+          setSongError(msg);
+          setIsSaving(false);
+          setIsUploadingSong(false);
+          return;
+        } finally {
+          setIsUploadingSong(false);
+        }
+      }
+
       const updates: any = {
         name,
         nickname,
-        avatar,
+        avatar: finalAvatar,
+        songUrl: finalSongUrl,
+        songTitle,
+        songArtist,
       };
 
       if (email) updates.email = email;
       if (authUid) updates.authUid = authUid;
 
       await updateDoc(doc(db, "players", player.id), updates);
+
+      // Admin-Status in users-Collection speichern (nur Super Admin)
+      const targetUid = authUid || player.authUid;
+      if (isSuperAdmin && targetUid) {
+        await setDoc(doc(db, "users", targetUid), {
+          role: isPlayerAdmin ? "admin" : "user",
+          email: email || player.email || "",
+        }, { merge: true });
+      }
+
       router.push("/players");
     } catch (error) {
       console.error("Error updating player:", error);
       alert("Failed to update player. " + (error as Error).message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSongFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSongError("");
+    if (file.size > 20 * 1024 * 1024) {
+      setSongError("Datei zu groß. Maximal 20 MB erlaubt.");
+      return;
+    }
+    if (!file.type.startsWith("audio/")) {
+      setSongError("Nur Audiodateien (.mp3) sind erlaubt.");
+      return;
+    }
+    setSongFile(file);
+    setSongFileName(file.name);
+    if (!songTitle) setSongTitle(file.name.replace(/\.[^/.]+$/, ""));
+  };
+
+  const handleRemoveSong = async () => {
+    if (!player) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, "players", player.id), { songUrl: "", songTitle: "", songArtist: "" });
+      setSongUrl("");
+      setSongTitle("");
+      setSongArtist("");
+      setSongFile(null);
+      setSongFileName("");
+    } catch (error) {
+      console.error("Error removing song:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!player) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, "players", player.id), { avatar: "" });
+      setAvatar("");
+      setAvatarPreview(null);
+      setAvatarFile(null);
+    } catch (error) {
+      console.error("Error removing avatar:", error);
     } finally {
       setIsSaving(false);
     }
@@ -155,12 +300,120 @@ export default function PlayerEditPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Avatar URL (Base64 or Image Link)</Label>
-              <Input
-                value={avatar}
-                onChange={(e) => setAvatar(e.target.value)}
-                placeholder="https://..."
+              <Label>Avatar</Label>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
+                  {avatarPreview || avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatarPreview ?? avatar}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <User className="w-8 h-8 text-zinc-400" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarFileChange}
+                  />
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isProcessing || isSaving}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {isProcessing ? "Wird verarbeitet..." : "Bild auswählen"}
+                    </Button>
+                    {(avatar || avatarPreview) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600"
+                        onClick={handleRemoveAvatar}
+                        disabled={isProcessing || isSaving}
+                      >
+                        Avatar entfernen
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-500">
+                    Max. 5 MB · wird automatisch auf 256×256 px skaliert und als WebP/AVIF gespeichert
+                  </p>
+                  {avatarError && (
+                    <p className="text-xs text-red-500">{avatarError}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Song Upload */}
+            <div className="space-y-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+              <Label>Einlaufsong</Label>
+              <input
+                ref={songInputRef}
+                type="file"
+                accept="audio/mpeg,audio/mp3,.mp3"
+                className="hidden"
+                onChange={handleSongFileChange}
               />
+              {(songUrl || songFileName) && (
+                <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800 rounded-md px-3 py-2 text-sm">
+                  <Music2 className="w-4 h-4 text-zinc-500 shrink-0" />
+                  <span className="truncate text-zinc-700 dark:text-zinc-300 flex-1">
+                    {songFileName || "Aktueller Song"}
+                  </span>
+                  <button onClick={handleRemoveSong} disabled={isSaving} className="text-zinc-400 hover:text-red-500 transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => songInputRef.current?.click()}
+                disabled={isUploadingSong || isSaving}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {isUploadingSong ? "Wird hochgeladen..." : songUrl ? "Song ersetzen" : "MP3 auswählen"}
+              </Button>
+              {songError && <p className="text-xs text-red-500">{songError}</p>}
+              <p className="text-xs text-zinc-500">Max. 20 MB · nur .mp3</p>
+
+              {/* Metadaten */}
+              {(songFile || songUrl) && (
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Titel</Label>
+                    <Input
+                      value={songTitle}
+                      onChange={(e) => setSongTitle(e.target.value)}
+                      placeholder="Song-Titel"
+                      maxLength={100}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Interpret</Label>
+                    <Input
+                      value={songArtist}
+                      onChange={(e) => setSongArtist(e.target.value)}
+                      placeholder="Künstler"
+                      maxLength={100}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {isAdmin && (
@@ -187,7 +440,33 @@ export default function PlayerEditPage() {
                     </div>
                   )}
                   {player?.authUid && (
-                    <p className="text-sm text-green-600">✓ Login configured</p>
+                    <p className="text-sm text-green-600">✓ Login konfiguriert</p>
+                  )}
+
+                  {/* Admin-Toggle nur für Super Admin, wenn Spieler einen Account hat */}
+                  {isSuperAdmin && (player?.authUid || (email && password)) && (
+                    <div className="flex items-center justify-between pt-2 border-t border-zinc-200 dark:border-zinc-700 mt-2">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-zinc-500" />
+                        <div>
+                          <p className="text-sm font-medium">Admin-Rechte</p>
+                          <p className="text-xs text-zinc-500">Spieler kann Turniere und Spieler verwalten</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsPlayerAdmin(!isPlayerAdmin)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          isPlayerAdmin ? "bg-zinc-900 dark:bg-white" : "bg-zinc-200 dark:bg-zinc-700"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-zinc-900 transition-transform ${
+                            isPlayerAdmin ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -198,8 +477,8 @@ export default function PlayerEditPage() {
             <Link href="/players">
               <Button variant="outline">Cancel</Button>
             </Link>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save Changes"}
+            <Button onClick={handleSave} disabled={isSaving || isProcessing || isUploadingSong}>
+              {isUploadingSong ? "Song wird hochgeladen..." : isProcessing ? "Wird verarbeitet..." : isSaving ? "Wird gespeichert..." : "Speichern"}
             </Button>
           </div>
         </div>

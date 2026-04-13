@@ -9,6 +9,7 @@ interface FirebaseContextType {
   user: User | null;
   isAuthReady: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   signIn: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   logOut: () => Promise<void>;
@@ -18,6 +19,7 @@ const FirebaseContext = createContext<FirebaseContextType>({
   user: null,
   isAuthReady: false,
   isAdmin: false,
+  isSuperAdmin: false,
   signIn: async () => {},
   signInWithEmail: async () => {},
   logOut: async () => {}
@@ -29,47 +31,51 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      
-      if (currentUser) {
-        // Check admin status first
-        let userIsAdmin = false;
-        if (currentUser.email === 'hello@danenso.com' || currentUser.uid === 'xV97IDspMmYcUkXvPP1eOlJD3KI2') {
-          userIsAdmin = true;
-          setIsAdmin(true);
-          // Ensure the user has the admin role in the database
-          try {
-            await setDoc(doc(db, 'users', currentUser.uid), { 
-              role: 'admin', 
-              email: currentUser.email 
-            }, { merge: true });
-          } catch (e) {
-            console.error("Failed to set admin role in DB", e);
-          }
-        } else {
-          try {
-            const userDoc = await getDocFromServer(doc(db, 'users', currentUser.uid));
-            userIsAdmin = userDoc.exists() && userDoc.data().role === 'admin';
-            setIsAdmin(userIsAdmin);
-          } catch (e) {
-            console.error("Failed to fetch user role", e);
-          }
-        }
-
-        try {
-          await getDocFromServer(doc(db, 'test', 'connection'));
-        } catch (error) {
-          if (error instanceof Error && error.message.includes('the client is offline')) {
-            console.error("Please check your Firebase configuration.");
-          }
-        }
-      } else {
-        setIsAdmin(false);
-      }
       setIsAuthReady(true);
+
+      if (!currentUser) {
+        setIsAdmin(false);
+        setIsSuperAdmin(false);
+        return;
+      }
+
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+      const adminUid = process.env.NEXT_PUBLIC_ADMIN_UID;
+
+      const isSA = !!(
+        (adminEmail && currentUser.email === adminEmail) ||
+        (adminUid && currentUser.uid === adminUid)
+      );
+
+      if (isSA) {
+        setIsSuperAdmin(true);
+        setIsAdmin(true);
+        setDoc(doc(db, 'users', currentUser.uid), {
+          role: 'admin',
+          email: currentUser.email
+        }, { merge: true }).catch((e) => console.error("Failed to set admin role in DB", e));
+      } else {
+        setIsSuperAdmin(false);
+        getDocFromServer(doc(db, 'users', currentUser.uid))
+          .then((userDoc) => {
+            if (userDoc.exists()) {
+              setIsAdmin(userDoc.data().role === 'admin');
+            } else {
+              // Neuen Nutzer in users-Collection eintragen
+              setDoc(doc(db, 'users', currentUser.uid), {
+                role: 'user',
+                email: currentUser.email
+              }, { merge: true }).catch((e) => console.error("Failed to create user doc", e));
+              setIsAdmin(false);
+            }
+          })
+          .catch(() => setIsAdmin(false));
+      }
     });
 
     return () => unsubscribe();
@@ -102,7 +108,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <FirebaseContext.Provider value={{ user, isAuthReady, isAdmin, signIn, signInWithEmail, logOut }}>
+    <FirebaseContext.Provider value={{ user, isAuthReady, isAdmin, isSuperAdmin, signIn, signInWithEmail, logOut }}>
       {children}
     </FirebaseContext.Provider>
   );

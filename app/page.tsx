@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Radius } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -36,6 +36,7 @@ export default function Home() {
   const { user, isAuthReady, signIn, signInWithEmail } = useFirebase();
   const router = useRouter();
   const [tournaments, setTournaments] = useState<any[]>([]);
+  const [seasons, setSeasons] = useState<any[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -51,9 +52,30 @@ export default function Home() {
   const [allowDoubleOut, setAllowDoubleOut] = useState(true);
   const [allowTripleOut, setAllowTripleOut] = useState(false);
   const [allowDraw, setAllowDraw] = useState(false);
+  // Season & Retroaktiv
+  const [selectedSeasonId, setSelectedSeasonId] = useState("");
+  const [tournamentNumber, setTournamentNumber] = useState<number | "">("");
+  const [isFinalTournament, setIsFinalTournament] = useState(false);
+  const [isRetroactive, setIsRetroactive] = useState(false);
 
   useEffect(() => {
     if (!isAuthReady || !user) return;
+
+    const qSeasons = query(
+      collection(db, "seasons"),
+      where("ownerId", "==", user.uid),
+    );
+    const unsubscribeSeasons = onSnapshot(
+      qSeasons,
+      (snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+        docs.sort((a, b) => a.number - b.number);
+        setSeasons(docs);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, "seasons");
+      },
+    );
 
     const q = query(
       collection(db, "tournaments"),
@@ -66,18 +88,14 @@ export default function Home() {
           id: doc.id,
           ...(doc.data() as any),
         }));
-        // Sort by createdAt descending locally
         allDocs.sort((a: any, b: any) => {
           const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           return timeB - timeA;
         });
-
         const t = allDocs.filter(
-          (doc) =>
-            doc.type !== "single_match" && doc.type !== "casual_tiebreak",
+          (doc) => doc.type !== "single_match" && doc.type !== "casual_tiebreak",
         );
-
         setTournaments(t);
       },
       (error) => {
@@ -101,6 +119,7 @@ export default function Home() {
     );
 
     return () => {
+      unsubscribeSeasons();
       unsubscribeTournaments();
       unsubscribePlayers();
     };
@@ -119,12 +138,26 @@ export default function Home() {
     }
   };
 
+  const resetForm = () => {
+    setTitle("");
+    setAllowSingleOut(false);
+    setAllowDoubleOut(true);
+    setAllowTripleOut(false);
+    setAllowDraw(false);
+    setSelectedSeasonId("");
+    setTournamentNumber("");
+    setIsFinalTournament(false);
+    setIsRetroactive(false);
+  };
+
   const createTournament = async () => {
     if (!user || !title.trim()) return;
+    const trimmedTitle = title.trim();
+    if (trimmedTitle.length > 100) return;
     setIsCreating(true);
     try {
-      const docRef = await addDoc(collection(db, "tournaments"), {
-        title: title.trim(),
+      const data: any = {
+        title: trimmedTitle,
         status: "draft",
         allowSingleOut,
         allowDoubleOut,
@@ -132,7 +165,17 @@ export default function Home() {
         allowDraw,
         createdAt: new Date().toISOString(),
         ownerId: user.uid,
-      });
+      };
+      if (selectedSeasonId) data.seasonId = selectedSeasonId;
+      if (isFinalTournament) {
+        data.isFinalTournament = true;
+      } else if (tournamentNumber !== "") {
+        data.tournamentNumber = Number(tournamentNumber);
+      }
+      if (isRetroactive) data.isRetroactive = true;
+
+      const docRef = await addDoc(collection(db, "tournaments"), data);
+      resetForm();
       router.push(`/tournament/${docRef.id}`);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "tournaments");
@@ -154,7 +197,7 @@ export default function Home() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-zinc-900 text-white rounded-full flex items-center justify-center mb-4">
-              <Radius size={24} />
+              <Icon icon="mdi:bullseye" className="w-6 h-6" />
             </div>
             <CardTitle className="text-2xl font-bold">
               Dart Tournament Manager
@@ -217,33 +260,116 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Your Tournaments
+              Deine Turniere
             </h1>
             <p className="text-zinc-500">
-              Manage your dart events and track results.
+              Verwalte deine Dart-Events und verfolge Ergebnisse.
             </p>
           </div>
           <div className="flex items-center gap-4 w-full sm:w-auto">
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
               <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
-                New Tournament
+                Neues Turnier
               </Button>
-              <DialogContent>
+              <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Create New Tournament</DialogTitle>
+                  <DialogTitle>Neues Turnier erstellen</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="title">Tournament Name *</Label>
+                    <Label htmlFor="title">Turniername *</Label>
                     <Input
                       id="title"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      placeholder="e.g. Freitagsturnier April"
+                      placeholder="z.B. Freitagsturnier April"
+                      maxLength={100}
                       required
                     />
+                    {title.trim().length > 80 && (
+                      <p className="text-xs text-zinc-400">{title.trim().length}/100 Zeichen</p>
+                    )}
                   </div>
-                  <div className="grid gap-2 mt-4">
+
+                  {/* Season-Zuordnung */}
+                  {seasons.length > 0 && (
+                    <div className="grid gap-2 pt-2 border-t">
+                      <Label>Season (optional)</Label>
+                      <select
+                        value={selectedSeasonId}
+                        onChange={(e) => setSelectedSeasonId(e.target.value)}
+                        className="border border-zinc-200 rounded-md px-3 py-2 text-sm bg-white dark:bg-zinc-900 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500"
+                      >
+                        <option value="">Keine Season</option>
+                        {seasons.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      {selectedSeasonId && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="isFinal"
+                              checked={isFinalTournament}
+                              onChange={(e) => {
+                                setIsFinalTournament(e.target.checked);
+                                if (e.target.checked) setTournamentNumber("");
+                              }}
+                            />
+                            <Label htmlFor="isFinal" className="font-normal">
+                              Final-Turnier dieser Season
+                            </Label>
+                          </div>
+                          {!isFinalTournament && (
+                            <div className="flex items-center gap-2">
+                              <Label className="whitespace-nowrap font-normal">
+                                Turnier Nr.
+                              </Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={10}
+                                value={tournamentNumber}
+                                onChange={(e) =>
+                                  setTournamentNumber(
+                                    e.target.value === ""
+                                      ? ""
+                                      : Number(e.target.value),
+                                  )
+                                }
+                                placeholder="1–10"
+                                className="w-24"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Retroaktiv */}
+                  <div className="grid gap-2 pt-2 border-t">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="isRetroactive"
+                        checked={isRetroactive}
+                        onChange={(e) => setIsRetroactive(e.target.checked)}
+                      />
+                      <Label htmlFor="isRetroactive" className="font-normal">
+                        Retroaktives Turnier{" "}
+                        <span className="text-zinc-400 text-xs">
+                          (Ergebnisse manuell eintragen)
+                        </span>
+                      </Label>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 pt-2 border-t">
                     <Label>Out Rules</Label>
                     <div className="flex items-center gap-2">
                       <input
@@ -279,7 +405,7 @@ export default function Home() {
                       </Label>
                     </div>
                   </div>
-                  <div className="grid gap-2 mt-4">
+                  <div className="grid gap-2">
                     <Label>Match Rules</Label>
                     <div className="flex items-center gap-2">
                       <input
@@ -297,15 +423,15 @@ export default function Home() {
                 <DialogFooter>
                   <Button
                     variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
+                    onClick={() => { setIsDialogOpen(false); resetForm(); }}
                   >
-                    Cancel
+                    Abbrechen
                   </Button>
                   <Button
                     onClick={createTournament}
                     disabled={isCreating || !title.trim()}
                   >
-                    {isCreating ? "Creating..." : "Create Tournament"}
+                    {isCreating ? "Erstelle..." : "Turnier erstellen"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -314,25 +440,43 @@ export default function Home() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {tournaments.map((t) => (
-            <Card
-              key={t.id}
-              className="cursor-pointer hover:border-zinc-400 transition-colors"
-              onClick={() => router.push(`/tournament/${t.id}`)}
-            >
-              <CardHeader>
-                <CardTitle className="text-lg">{t.title}</CardTitle>
-                <CardDescription>
-                  {new Date(t.createdAt).toLocaleDateString()}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-zinc-100 text-zinc-900">
-                  {t.status.toUpperCase()}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {tournaments.map((t) => {
+            const season = seasons.find((s) => s.id === t.seasonId);
+            return (
+              <Card
+                key={t.id}
+                className="cursor-pointer hover:border-zinc-400 transition-colors"
+                onClick={() => router.push(`/tournament/${t.id}`)}
+              >
+                <CardHeader>
+                  <CardTitle className="text-lg">{t.title}</CardTitle>
+                  <CardDescription>
+                    {new Date(t.createdAt).toLocaleDateString()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-zinc-100 text-zinc-900">
+                    {t.status.toUpperCase()}
+                  </div>
+                  {season && (
+                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-blue-100 text-blue-800">
+                      {season.name}
+                      {t.isFinalTournament
+                        ? " · Final"
+                        : t.tournamentNumber
+                          ? ` · #${t.tournamentNumber}`
+                          : ""}
+                    </div>
+                  )}
+                  {t.isRetroactive && (
+                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-orange-100 text-orange-700">
+                      Retroaktiv
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
           {tournaments.length === 0 && (
             <div className="col-span-full py-12 text-center border-2 border-dashed rounded-lg border-zinc-200">
               <p className="text-zinc-500">

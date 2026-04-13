@@ -18,10 +18,6 @@ service cloud.firestore {
       return request.resource.data.keys().hasAll(fields);
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
     function isValidStringLength(val, minLen, maxLen) {
       return val is string && val.size() >= minLen && val.size() <= maxLen;
     }
@@ -30,11 +26,17 @@ service cloud.firestore {
       return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
     }
 
+    function isSuperAdmin() {
+      return isAuthenticated() &&
+        ((request.auth.token.email == "hello@danenso.com" && request.auth.token.email_verified == true) ||
+          request.auth.uid == 'xV97IDspMmYcUkXvPP1eOlJD3KI2');
+    }
+
     function isAdmin() {
       return isAuthenticated() &&
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "hello@danenso.com" && request.auth.token.email_verified == true) ||
-          request.auth.uid == 'xV97IDspMmYcUkXvPP1eOlJD3KI2');
+        (isSuperAdmin() ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     // ===============================================================
@@ -64,7 +66,20 @@ service cloud.firestore {
              (!('allowDoubleOut' in data) || data.allowDoubleOut is bool) &&
              (!('allowTripleOut' in data) || data.allowTripleOut is bool) &&
              (!('allowDraw' in data) || data.allowDraw is bool) &&
-             (!('type' in data) || data.type is string);
+             (!('type' in data) || data.type is string) &&
+             (!('seasonId' in data) || data.seasonId is string) &&
+             (!('tournamentNumber' in data) || data.tournamentNumber is number) &&
+             (!('isFinalTournament' in data) || data.isFinalTournament is bool) &&
+             (!('isRetroactive' in data) || data.isRetroactive is bool);
+    }
+
+    function isValidSeason(data) {
+      return hasRequiredFields(['name', 'number', 'status', 'createdAt', 'ownerId']) &&
+             isValidStringLength(data.name, 1, 50) &&
+             data.number is number && data.number >= 1 &&
+             data.status in ['active', 'completed'] &&
+             isValidDateString(data.createdAt) &&
+             data.ownerId == request.auth.uid;
     }
 
     function isValidPlayer(data) {
@@ -114,11 +129,18 @@ service cloud.firestore {
     // ===============================================================
     // Rules
     // ===============================================================
+    match /seasons/{seasonId} {
+      allow read: if isOwner(resource.data.ownerId) || isAdmin();
+      allow create: if isAuthenticated() && isValidSeason(request.resource.data);
+      allow update: if (isOwner(resource.data.ownerId) || isAdmin()) && isValidSeason(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create: if isAuthenticated() && isAdmin() && isValidUser(request.resource.data);
-      allow update: if isAuthenticated() && isAdmin() && isValidUser(request.resource.data);
-      allow delete: if isAuthenticated() && isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId && request.resource.data.role == 'user' && isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && isSuperAdmin() && isValidUser(request.resource.data);
+      allow delete: if isAuthenticated() && isSuperAdmin();
     }
 
     match /players/{playerId} {
@@ -126,6 +148,22 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidGlobalPlayer(request.resource.data);
       allow update: if isOwner(resource.data.ownerId) && isValidGlobalPlayer(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
       allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /liga/{ligaId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.ownerId) || isAdmin();
+
+      match /seasons/{seasonId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(get(/databases/$(database)/documents/liga/$(ligaId)).data.ownerId) || isAdmin();
+
+        match /games/{gameId} {
+          allow read: if isAuthenticated();
+          allow write: if isOwner(get(/databases/$(database)/documents/liga/$(ligaId)).data.ownerId) || isAdmin();
+        }
+      }
     }
 
     match /tournaments/{tournamentId} {
