@@ -25,6 +25,14 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Pfeilwurf',
+  },
+  formatDetection: {
+    telephone: false,
+  },
   openGraph: {
     title: 'Pfeilwurf.de – Dart Turnier & Liga Manager',
     description: 'Turniere, Liga & Statistiken – alles für dein Dart-Team',
@@ -37,6 +45,11 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="de" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
+      <head>
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="theme-color" content="#e11d48" />
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
       <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <ThemeCustomizerProvider>
