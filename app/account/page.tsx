@@ -2,6 +2,7 @@
 
 import { useFirebase } from "@/components/FirebaseProvider";
 import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { auth, db } from "@/lib/firebase";
@@ -26,7 +27,7 @@ import { User, Shield, ShieldOff, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function AccountPage() {
-  const { user, isAdmin, isSuperAdmin } = useFirebase();
+  const { user, isAdmin, isSuperAdmin, logOut } = useFirebase();
   const [playerProfile, setPlayerProfile] = useState<any>(null);
 
   // Profil-Felder
@@ -244,6 +245,22 @@ export default function AccountPage() {
             </div>
           </div>
         )}
+
+        {/* Abmelden */}
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-sm">Abmelden</p>
+            <p className="text-sm text-zinc-500 mt-0.5">Du wirst aus deinem Konto abgemeldet.</p>
+          </div>
+          <Button
+            variant="destructive"
+            onClick={logOut}
+            className="shrink-0 gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Abmelden
+          </Button>
+        </div>
 
         {/* Super Admin Panel */}
         {isSuperAdmin && (
