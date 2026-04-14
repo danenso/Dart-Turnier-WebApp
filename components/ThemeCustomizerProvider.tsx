@@ -216,6 +216,7 @@ function applyThemeToDOM(s: ThemeCustomSettings) {
       font-family: var(--font-heading, var(--font-sans));
       text-transform: ${s.headingTransform};
       font-style: ${s.headingStyle};
+      font-weight: 500;
     }
   `;
 }
