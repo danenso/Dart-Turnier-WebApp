@@ -533,10 +533,10 @@ export default function CasualGamesPage() {
             </div>
           </div>
 
-          {/* Bottom row: Date + extra info for completed */}
-          <div className="mt-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
+          {/* Bottom row: Date + Status + Delete in einer Zeile */}
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-[11px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1 shrink-0">
                 <Clock className="w-3 h-3" />
                 {formatDate(game.createdAt)}
               </span>
@@ -546,32 +546,25 @@ export default function CasualGamesPage() {
                 </span>
               )}
               {isCompleted && !isDraw && (aWon || bWon) && (
-                <span className="text-[11px] font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <Trophy className="w-3 h-3" />
+                <span className="text-[11px] font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-2 py-0.5 rounded-full flex items-center gap-1 truncate">
+                  <Trophy className="w-3 h-3 shrink-0" />
                   {aWon ? matchData?.playerAName : matchData?.playerBName} gewinnt
                 </span>
               )}
             </div>
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(game.id); }}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                <span className="text-xs">Löschen</span>
+              </Button>
+            )}
           </div>
         </div>
-
-        {/* Admin delete button */}
-        {isAdmin && (
-          <div className="px-4 pb-3 flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeleteConfirmId(game.id);
-              }}
-            >
-              <Trash2 className="w-3.5 h-3.5 mr-1" />
-              <span className="text-xs">Löschen</span>
-            </Button>
-          </div>
-        )}
       </div>
     );
   };
@@ -625,11 +618,6 @@ export default function CasualGamesPage() {
                 )}
               </div>
             </div>
-
-            <span className="text-[11px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1 shrink-0">
-              <Clock className="w-3 h-3" />
-              {formatDate(game.createdAt)}
-            </span>
           </div>
 
           {/* Players */}
@@ -656,24 +644,26 @@ export default function CasualGamesPage() {
               );
             })}
           </div>
-        </div>
 
-        {isAdmin && (
-          <div className="px-4 pb-3 flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeleteConfirmId(game.id);
-              }}
-            >
-              <Trash2 className="w-3.5 h-3.5 mr-1" />
-              <span className="text-xs">Löschen</span>
-            </Button>
+          {/* Datum + Löschen in einer Zeile */}
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatDate(game.createdAt)}
+            </span>
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(game.id); }}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                <span className="text-xs">Löschen</span>
+              </Button>
+            )}
           </div>
-        )}
+        </div>
       </div>
     );
   };
