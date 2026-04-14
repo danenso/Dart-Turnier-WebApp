@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
 import { slugify } from '@/lib/slugify';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, addDoc, getDocs } from 'firebase/firestore';
 import { SongPlayer } from '@/components/SongPlayer';
 import { Icon } from '@iconify/react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Swords } from 'lucide-react';
 
 type ViewMode = 'list' | 'card';
 
@@ -22,6 +23,11 @@ export default function PlayersPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const searchParams = useSearchParams();
   const [showInvitedBanner, setShowInvitedBanner] = useState(false);
+  const [myPlayer, setMyPlayer] = useState<any>(null);
+  const [challengeTarget, setChallengeTarget] = useState<any>(null);
+  const [challengeFormat, setChallengeFormat] = useState('501_bo3');
+  const [challengeSending, setChallengeSending] = useState(false);
+  const [challengeSent, setChallengeSent] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get('invited') === '1') {
@@ -60,6 +66,39 @@ export default function PlayersPage() {
 
     return () => unsubscribe();
   }, [user, isAuthReady, isAdmin]);
+
+  // Load current user's own player profile (for sending challenges)
+  useEffect(() => {
+    if (!user) return;
+    getDocs(query(collection(db, 'players'), where('authUid', '==', user.uid)))
+      .then(snap => { if (!snap.empty) setMyPlayer({ id: snap.docs[0].id, ...snap.docs[0].data() }); })
+      .catch(() => {});
+  }, [user]);
+
+  const sendChallenge = async () => {
+    if (!user || !myPlayer || !challengeTarget) return;
+    setChallengeSending(true);
+    try {
+      await addDoc(collection(db, 'challenges'), {
+        fromUserId: user.uid,
+        toUserId: challengeTarget.authUid,
+        fromPlayerId: myPlayer.id,
+        toPlayerId: challengeTarget.id,
+        fromPlayerName: myPlayer.nickname || myPlayer.name,
+        toPlayerName: challengeTarget.nickname || challengeTarget.name,
+        format: challengeFormat,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      });
+      setChallengeSent(challengeTarget.id);
+      setChallengeTarget(null);
+      setTimeout(() => setChallengeSent(null), 4000);
+    } catch (e) {
+      console.error('Challenge error:', e);
+    } finally {
+      setChallengeSending(false);
+    }
+  };
 
   if (!isAuthReady) return <div className="p-8">Loading...</div>;
 
@@ -164,6 +203,17 @@ export default function PlayersPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      {/* Challenge button: only for players with accounts that aren't the current user */}
+                      {myPlayer && player.authUid && player.authUid !== user?.uid && (
+                        <Button
+                          variant="ghost" size="icon"
+                          title="Herausfordern"
+                          onClick={() => setChallengeTarget(player)}
+                          className={challengeSent === player.id ? 'text-green-500' : 'text-blue-400'}
+                        >
+                          <Swords className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Link href={`/players/${slug}`}>
                         <Button variant="ghost" size="icon" title="Statistiken">
                           <Icon icon={getIcon('standings')} className="w-4 h-4 text-zinc-500" />
@@ -232,6 +282,16 @@ export default function PlayersPage() {
                         Statistiken
                       </Button>
                     </Link>
+                    {myPlayer && player.authUid && player.authUid !== user?.uid && (
+                      <Button
+                        variant="outline" size="sm"
+                        className={`gap-1.5 ${challengeSent === player.id ? 'text-green-500 border-green-500/40' : 'text-blue-400 border-blue-400/40'}`}
+                        onClick={() => setChallengeTarget(player)}
+                      >
+                        <Swords className="w-3.5 h-3.5" />
+                        {challengeSent === player.id ? 'Gesendet' : 'Herausfordern'}
+                      </Button>
+                    )}
                     {isAdmin && (
                       <Link href={`/players/${slug}/edit`}>
                         <Button variant="ghost" size="icon" title="Bearbeiten">
@@ -246,6 +306,56 @@ export default function PlayersPage() {
           </div>
         )}
       </div>
+
+      {/* Challenge Dialog */}
+      {challengeTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setChallengeTarget(null)}>
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center">
+                <Swords className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="font-bold text-zinc-900 dark:text-zinc-100">Herausfordern</p>
+                <p className="text-sm text-zinc-500">{challengeTarget.nickname || challengeTarget.name}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 mb-5">
+              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Spielmodus</p>
+              {[
+                { value: '501_bo1', label: '501 · Best of 1' },
+                { value: '501_bo3', label: '501 · Best of 3' },
+                { value: '501_bo5', label: '501 · Best of 5' },
+                { value: '301_bo3', label: '301 · Best of 3' },
+              ].map(opt => (
+                <label key={opt.value} className="flex items-center gap-3 cursor-pointer">
+                  <div className={`w-4 h-4 rounded-full border-2 transition-colors flex items-center justify-center ${challengeFormat === opt.value ? 'border-blue-500 bg-blue-500' : 'border-zinc-300 dark:border-zinc-600'}`}>
+                    {challengeFormat === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <input
+                    type="radio"
+                    name="format"
+                    value={opt.value}
+                    checked={challengeFormat === opt.value}
+                    onChange={() => setChallengeFormat(opt.value)}
+                    className="sr-only"
+                  />
+                  <span className="text-sm text-zinc-700 dark:text-zinc-300">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setChallengeTarget(null)}>Abbrechen</Button>
+              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 gap-1.5" disabled={challengeSending} onClick={sendChallenge}>
+                <Swords className="w-4 h-4" />
+                {challengeSending ? 'Sende…' : 'Herausfordern'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

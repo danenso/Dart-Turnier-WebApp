@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { db } from "@/lib/firebase";
+import { ChallengeNotification } from "./ChallengeNotification";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -43,6 +44,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!user) return <>{children}</>;
 
+  // Challenge notifications are global (shown on all pages)
+
   const mainNav = [
     { name: "Liga",               href: "/liga",        iconKey: "liga"        as const },
     { name: t("nav.tournaments"), href: "/tournaments", iconKey: "tournaments" as const },
@@ -63,6 +66,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
+      <ChallengeNotification />
 
       {/* ── Desktop Sidebar ── */}
       {!isMatchPage && (

@@ -18,7 +18,8 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-import { ArrowLeft, Radius, Undo2, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Radius, Undo2, ChevronRight, Volume2, VolumeX, Eye, Target } from "lucide-react";
+import { DartboardStarter } from "@/components/DartboardStarter";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BOT_PLAYER_ID, generateAITurn, AI_DIFFICULTY_LABELS, type AIDifficulty } from "@/lib/ai-player";
@@ -33,7 +34,7 @@ interface Dart {
 
 export default function MatchPage() {
   const { id, matchId } = useParams() as { id: string; matchId: string };
-  const { user, isAuthReady } = useFirebase();
+  const { user, isAuthReady, isAdmin } = useFirebase();
   const router = useRouter();
 
   const [match, setMatch] = useState<any>(null);
@@ -46,9 +47,21 @@ export default function MatchPage() {
   const [playerBProfile, setPlayerBProfile] = useState<any>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [aiThinking, setAiThinking] = useState(false);
+  const [profilesLoaded, setProfilesLoaded] = useState(false);
+  const [dartboardMode, setDartboardMode] = useState(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const submitTurnRef = useRef<typeof submitTurn | null>(null);
   const aiThinkingRef = useRef(false);
+  const lastSoundTsRef = useRef<number>(0);
+  const currentDartSoundsRef = useRef<string[]>([]);
+  const voiceEnabledRef = useRef(voiceEnabled);
+
+  // Keep voiceEnabledRef in sync so onSnapshot closure can read current value
+  useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
+
+  const canInput = isAdmin ||
+    !profilesLoaded ||
+    (user != null && (playerAProfile?.authUid === user.uid || playerBProfile?.authUid === user.uid));
 
   useEffect(() => {
     if (!isAuthReady || !user || !id || !matchId) return;
@@ -57,7 +70,23 @@ export default function MatchPage() {
       doc(db, "tournaments", id, "matches", matchId),
       (docSnap) => {
         if (docSnap.exists()) {
-          setMatch({ id: docSnap.id, ...docSnap.data() });
+          const data = docSnap.data();
+          setMatch({ id: docSnap.id, ...data });
+
+          // Play sounds on all non-triggering devices
+          const ev = data.soundEvent;
+          if (ev && ev.ts > lastSoundTsRef.current && ev.fromUid !== user.uid) {
+            lastSoundTsRef.current = ev.ts;
+            const sounds: string[] = ev.sounds ?? [];
+            sounds.forEach((sound: string, i: number) => {
+              setTimeout(() => {
+                if (!voiceEnabledRef.current) return;
+                const audio = new Audio(`/sounds/dart/${sound}.mp3`);
+                audio.volume = 1;
+                audio.play().catch(() => {});
+              }, i * 680);
+            });
+          }
         } else {
           router.push(`/tournament/${id}`);
         }
@@ -128,8 +157,10 @@ export default function MatchPage() {
         ]);
         if (snapA.exists()) setPlayerAProfile({ id: snapA.id, ...snapA.data() });
         if (snapB.exists()) setPlayerBProfile({ id: snapB.id, ...snapB.data() });
+        setProfilesLoaded(true);
       } catch (e) {
         console.error("Fehler beim Laden der Spielerprofile", e);
+        setProfilesLoaded(true); // unblock on error
       }
     };
     fetchProfiles();
@@ -155,12 +186,15 @@ export default function MatchPage() {
   };
 
   const speakDart = (baseValue: number, mult: string) => {
-    if (baseValue === 0) playSound("miss");
-    else if (baseValue === 25 && mult === "double") playSound("bullseye");
-    else if (baseValue === 25) playSound("25");
-    else if (mult === "double") playSound(`d${baseValue}`);
-    else if (mult === "triple") playSound(`t${baseValue}`);
-    else playSound(String(baseValue));
+    let sound: string;
+    if (baseValue === 0) sound = "miss";
+    else if (baseValue === 25 && mult === "double") sound = "bullseye";
+    else if (baseValue === 25) sound = "25";
+    else if (mult === "double") sound = `d${baseValue}`;
+    else if (mult === "triple") sound = `t${baseValue}`;
+    else sound = String(baseValue);
+    currentDartSoundsRef.current.push(sound);
+    playSound(sound);
   };
 
   const setStarter = async (playerId: string) => {
@@ -175,6 +209,7 @@ export default function MatchPage() {
         playerAScored: 0,
         playerBScored: 0,
         turns: [],
+        soundEvent: { sounds: ["gameon"], ts: Date.now(), fromUid: user?.uid ?? "" },
       });
     } catch (error) {
       handleFirestoreError(
@@ -262,6 +297,8 @@ export default function MatchPage() {
     const turnScore = darts.reduce((sum, d) => sum + d.scoredPoints, 0);
 
     let updates: any = {};
+    const syncSounds: string[] = [...currentDartSoundsRef.current];
+    currentDartSoundsRef.current = [];
 
     setHistory([
       ...history,
@@ -290,8 +327,10 @@ export default function MatchPage() {
 
     // Sound-Events für die Runde
     if (isBust) {
+      syncSounds.push("bust");
       playSound("bust", true);
     } else if (turnScore === 180) {
+      syncSounds.push("180");
       playSound("180", true);
     }
 
@@ -363,8 +402,8 @@ export default function MatchPage() {
         isDraw;
 
       if (matchFullyEnded) {
-        if (isDraw) playSound("draw", true);
-        else playSound("gameshot", true);
+        if (isDraw) { syncSounds.push("draw"); playSound("draw", true); }
+        else { syncSounds.push("gameshot"); playSound("gameshot", true); }
 
         updates.status = "completed";
         updates.playerALegs = newPlayerALegs;
@@ -509,6 +548,11 @@ export default function MatchPage() {
       }
     }
 
+    // Broadcast sounds to all other devices
+    if (syncSounds.length > 0) {
+      updates.soundEvent = { sounds: syncSounds, ts: Date.now(), fromUid: user?.uid ?? "" };
+    }
+
     try {
       await updateDoc(doc(db, "tournaments", id, "matches", matchId), updates);
       setCurrentDarts([]);
@@ -646,9 +690,11 @@ export default function MatchPage() {
 
           {/* Name als Button — Bot-Karte startet immer mit Mensch */}
           <button
-            onClick={() => isBot ? setStarter(match.playerAId) : setStarter(playerId)}
+            onClick={() => canInput ? (isBot ? setStarter(match.playerAId) : setStarter(playerId)) : undefined}
+            disabled={!canInput}
             className={`group relative w-full px-6 py-3 md:px-8 md:py-4 rounded-xl font-bold text-base md:text-lg
-              active:scale-95 transition-all duration-200 shadow-lg focus:outline-none
+              transition-all duration-200 shadow-lg focus:outline-none
+              ${!canInput ? "opacity-40 cursor-not-allowed" : "active:scale-95"}
               ${isBot
                 ? "text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-400/40 hover:bg-amber-500/20 hover:border-amber-400/60 focus:ring-2 focus:ring-amber-400/40"
                 : "text-zinc-800 dark:text-white bg-zinc-900/8 border border-zinc-900/15 hover:bg-zinc-900/15 hover:border-zinc-900/25 dark:bg-white/10 dark:border-white/20 dark:hover:bg-white/20 dark:hover:border-white/40 focus:ring-2 focus:ring-zinc-900/25 dark:focus:ring-white/40"
@@ -702,7 +748,7 @@ export default function MatchPage() {
           .match-fade-up     { animation: matchFadeUp     0.5s  ease-out 0.35s both; }
         `}</style>
 
-        <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 overflow-auto">
+        <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 overflow-auto relative">
 
           {/* Top: Format Badge */}
           <div className="flex justify-center pt-6 pb-2 match-fade-down">
@@ -738,12 +784,45 @@ export default function MatchPage() {
             </div>
           </div>
 
-          {/* Bottom: Venue / Tournament name */}
-          <div className="flex justify-center pb-6 pt-2 match-fade-up">
+          {/* Bottom: Venue / Dartboard toggle */}
+          <div className="flex flex-col items-center gap-3 pb-6 pt-2 match-fade-up">
             <div className="px-5 py-1.5 rounded-full bg-zinc-900/5 border border-zinc-900/8 dark:bg-white/5 dark:border-white/10 text-zinc-500 dark:text-zinc-500 text-xs font-medium tracking-widest uppercase">
               {venueLabel}
             </div>
+            {canInput && !isVsAI && (
+              <button
+                onClick={() => setDartboardMode(!dartboardMode)}
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <Target className="w-3.5 h-3.5" />
+                {dartboardMode ? 'Namen antippen' : 'Per Dartscheibe entscheiden'}
+              </button>
+            )}
           </div>
+
+          {/* Dartboard starter overlay */}
+          {dartboardMode && canInput && !isVsAI && (
+            <div className="absolute inset-0 z-10 bg-zinc-950/95 flex flex-col items-center justify-center p-4 overflow-auto">
+              <h3 className="text-lg font-bold text-white mb-1">Wer beginnt — Dartscheibe</h3>
+              <p className="text-sm text-zinc-400 mb-4">Höchster Wurf beginnt das Spiel</p>
+              <DartboardStarter
+                playerAId={match.playerAId}
+                playerBId={match.playerBId}
+                playerAName={match.playerAName}
+                playerBName={match.playerBName}
+                onDecide={(starterId) => {
+                  setDartboardMode(false);
+                  setStarter(starterId);
+                }}
+              />
+              <button
+                onClick={() => setDartboardMode(false)}
+                className="mt-4 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          )}
         </div>
       </>
     );
@@ -1057,6 +1136,11 @@ export default function MatchPage() {
                 Answer Throw!
               </span>
             )}
+            {!canInput && profilesLoaded && (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-zinc-500/20 border border-zinc-500/30 text-zinc-400 rounded text-xs font-medium">
+                <Eye className="w-3 h-3" /> Zuschauer
+              </span>
+            )}
           </div>
 
           <button
@@ -1123,6 +1207,21 @@ export default function MatchPage() {
                   Nächstes Match <ChevronRight className="ml-2 w-5 h-5" />
                 </Button>
               )}
+            </div>
+          </div>
+        ) : !canInput && profilesLoaded ? (
+          /* Spectator view */
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 bg-white dark:bg-zinc-950">
+            <Eye className="w-12 h-12 text-zinc-300 dark:text-zinc-700" />
+            <div className="text-center">
+              <p className="text-lg font-semibold text-zinc-600 dark:text-zinc-300">Zuschauer-Modus</p>
+              <p className="text-sm text-zinc-400 mt-1">
+                Du schaust live zu · nur die Spieler und der Admin können Punkte eintragen
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-blue-400 animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
+              Live
             </div>
           </div>
         ) : (
