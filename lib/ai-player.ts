@@ -1,4 +1,4 @@
-export const BOT_PLAYER_ID = "__ai_bot__";
+export const BOT_PLAYER_ID = "ai-bot-player";
 export type AIDifficulty = "easy" | "medium" | "hard";
 
 export interface AIDart {
