@@ -88,20 +88,23 @@ function FontPreview({
   bodyFont,
   headingTransform,
   headingStyle,
+  headingWeight,
 }: {
   headingFont: string;
   bodyFont: string;
   headingTransform: string;
   headingStyle: string;
+  headingWeight: string;
 }) {
   return (
     <div className="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 space-y-1.5">
       <p
-        className="text-lg font-bold text-zinc-900 dark:text-zinc-100"
+        className="text-lg text-zinc-900 dark:text-zinc-100"
         style={{
           fontFamily: `"${headingFont}", sans-serif`,
           textTransform: headingTransform as any,
           fontStyle: headingStyle,
+          fontWeight: headingWeight,
         }}
       >
         Dart Turnier Manager
@@ -308,7 +311,26 @@ export function SettingsPanel() {
               </button>
             </div>
           </div>
-          <FontPreview headingFont={settings.headingFont} bodyFont={settings.bodyFont} headingTransform={settings.headingTransform} headingStyle={settings.headingStyle} />
+          <div className="space-y-2">
+            <Label>Schriftdicke</Label>
+            <div className="flex flex-wrap gap-2">
+              {([
+                { value: "300", label: "Dünn" },
+                { value: "400", label: "Normal" },
+                { value: "500", label: "Mittel" },
+                { value: "600", label: "Halb-Fett" },
+                { value: "700", label: "Fett" },
+                { value: "800", label: "Extra-Fett" },
+              ] as const).map((opt) => (
+                <button key={opt.value} title={opt.label} onClick={() => updateSettings({ headingWeight: opt.value })}
+                  className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${settings.headingWeight === opt.value ? "border-primary bg-primary/5 text-primary" : "border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:border-zinc-300"}`}
+                  style={{ fontWeight: opt.value }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <FontPreview headingFont={settings.headingFont} bodyFont={settings.bodyFont} headingTransform={settings.headingTransform} headingStyle={settings.headingStyle} headingWeight={settings.headingWeight} />
         </CardContent>
       </Card>
 

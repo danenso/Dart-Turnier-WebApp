@@ -413,7 +413,7 @@ export default function CasualGamesPage() {
                     <Trophy className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
                   )}
                   <span
-                    className={`font-semibold text-sm leading-tight truncate ${
+                    className={`text-sm leading-tight truncate ${
                       aWon
                         ? "text-green-600 dark:text-green-400"
                         : bWon
@@ -422,13 +422,14 @@ export default function CasualGamesPage() {
                             ? "text-orange-500"
                             : "text-zinc-900 dark:text-zinc-100"
                     }`}
+                    style={playerA?.nickname ? { fontFamily: "var(--font-heading, sans-serif)", fontWeight: "var(--heading-weight, 700)" } : { fontWeight: 600 }}
                   >
-                    {matchData?.playerAName || "—"}
+                    {playerA?.nickname || matchData?.playerAName || "—"}
                   </span>
                 </div>
                 {playerA?.nickname && (
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate">
-                    &ldquo;{playerA.nickname}&rdquo;
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate leading-tight">
+                    {matchData?.playerAName}
                   </p>
                 )}
               </div>
@@ -507,7 +508,7 @@ export default function CasualGamesPage() {
               <div className="min-w-0 text-right">
                 <div className="flex items-center justify-end gap-1">
                   <span
-                    className={`font-semibold text-sm leading-tight truncate ${
+                    className={`text-sm leading-tight truncate ${
                       bWon
                         ? "text-green-600 dark:text-green-400"
                         : aWon
@@ -516,16 +517,17 @@ export default function CasualGamesPage() {
                             ? "text-orange-500"
                             : "text-zinc-900 dark:text-zinc-100"
                     }`}
+                    style={playerB?.nickname ? { fontFamily: "var(--font-heading, sans-serif)", fontWeight: "var(--heading-weight, 700)" } : { fontWeight: 600 }}
                   >
-                    {matchData?.playerBName || "—"}
+                    {playerB?.nickname || matchData?.playerBName || "—"}
                   </span>
                   {bWon && (
                     <Trophy className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
                   )}
                 </div>
                 {playerB?.nickname && (
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate">
-                    &ldquo;{playerB.nickname}&rdquo;
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate leading-tight">
+                    {matchData?.playerBName}
                   </p>
                 )}
               </div>
@@ -631,12 +633,15 @@ export default function CasualGamesPage() {
                 >
                   <PlayerAvatar playerId={pid} size="sm" />
                   <div>
-                    <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      {playerNames[i] || player?.name || "—"}
+                    <span
+                      className="text-xs text-zinc-700 dark:text-zinc-300"
+                      style={player?.nickname ? { fontFamily: "var(--font-heading, sans-serif)", fontWeight: "var(--heading-weight, 700)" } : { fontWeight: 500 }}
+                    >
+                      {player?.nickname || playerNames[i] || player?.name || "—"}
                     </span>
                     {player?.nickname && (
                       <span className="text-[10px] text-zinc-400 ml-1">
-                        &ldquo;{player.nickname}&rdquo;
+                        {playerNames[i] || player?.name}
                       </span>
                     )}
                   </div>

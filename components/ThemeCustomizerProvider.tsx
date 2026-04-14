@@ -14,6 +14,7 @@ export interface ThemeCustomSettings {
   bodyFont: string;
   headingTransform: "none" | "uppercase" | "lowercase" | "capitalize";
   headingStyle: "normal" | "italic";
+  headingWeight: "300" | "400" | "500" | "600" | "700" | "800";
   primaryColor: string;
   primaryFgColor: string;
   secondaryColor: string;
@@ -29,6 +30,7 @@ export const DEFAULT_THEME_SETTINGS: ThemeCustomSettings = {
   bodyFont: "Inter",
   headingTransform: "uppercase",
   headingStyle: "normal",
+  headingWeight: "700",
   primaryColor: "#D4AF37",
   primaryFgColor: "#1a1a1a",
   secondaryColor: "#f5f5f5",
@@ -214,11 +216,14 @@ function applyThemeToDOM(s: ThemeCustomSettings) {
       --primary-foreground: ${s.primaryFgColor};
       --foreground: ${s.darkForeground};
     }
+    :root {
+      --heading-weight: ${s.headingWeight};
+    }
     h1, h2, h3, h4, h5, h6 {
       font-family: var(--font-heading, var(--font-sans));
       text-transform: ${s.headingTransform};
       font-style: ${s.headingStyle};
-      font-weight: 500;
+      font-weight: ${s.headingWeight};
     }
   `;
 }
