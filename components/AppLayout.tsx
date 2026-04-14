@@ -69,7 +69,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   icon={getIcon("logo")}
                   className="w-6 h-6 text-zinc-900 dark:text-zinc-50 shrink-0"
                 />
-                Darts Manager
+                Pfeilwurf.de
               </h2>
             )}
             {isCollapsed && (
