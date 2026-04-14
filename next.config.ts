@@ -13,7 +13,6 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
   reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,
@@ -42,6 +41,20 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  async headers() {
+    return [
+      {
+        // HTML-Seiten nie cachen — Browser holt immer die aktuelle Version
+        source: '/((?!_next/static|_next/image|favicon.ico).*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+    ];
   },
   transpilePackages: ['motion'],
   webpack: (config, { dev }) => {
