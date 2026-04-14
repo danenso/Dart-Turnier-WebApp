@@ -610,8 +610,8 @@ export default function TournamentPage() {
 
   if (tournament.type === "casual_tiebreak") {
     return (
-      <div className="p-4 md:p-6 lg:p-8 space-y-6">
-        <div>
+      <div className="page-pad">
+        <div className="section-gap">
           <Button
             variant="ghost"
             onClick={() => router.push("/casual")}

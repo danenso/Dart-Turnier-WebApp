@@ -285,8 +285,8 @@ export default function PlayerEditPage() {
   if (!isAuthReady || !player) return <div className="p-8">Loading...</div>;
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-8">
-      <div>
+    <div className="page-pad">
+      <div className="section-gap">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/players">

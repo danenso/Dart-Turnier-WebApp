@@ -128,128 +128,39 @@
     }
 }
 
-/* ── Fluid Spacing Scale ─────────────────────────────────────────────────────
-   CSS outside @layer beats @layer utilities, so these override Tailwind.
-   clamp(min, preferred, max) — min = mobile, max = large desktop.
-   Preferred uses vw so values scale smoothly between breakpoints.
+/* ── Fluid Layout Utilities ──────────────────────────────────────────────────
+   Eigene Klassen (kein Tailwind-Override) für Layout-Ebene.
+   Nur auf Seiten-Wrapper und Sektions-Container anwenden – nie auf
+   kleine UI-Komponenten wie Buttons, Badges, Inputs.
 ──────────────────────────────────────────────────────────────────────────── */
-:root {
-  --fs-1:  clamp(0.2rem,   0.4vw,  0.35rem);
-  --fs-2:  clamp(0.4rem,   0.8vw,  0.6rem);
-  --fs-3:  clamp(0.6rem,   1.1vw,  0.85rem);
-  --fs-4:  clamp(0.8rem,   1.6vw,  1.2rem);
-  --fs-5:  clamp(1rem,     2vw,    1.4rem);
-  --fs-6:  clamp(1.1rem,   2.4vw,  1.7rem);
-  --fs-8:  clamp(1.4rem,   3.2vw,  2.4rem);
-  --fs-10: clamp(1.8rem,   4vw,    3rem);
-  --fs-12: clamp(2rem,     5vw,    3.5rem);
-  --fs-16: clamp(2.5rem,   6vw,    4.5rem);
+
+/* Seiten-Außenabstand: mobil knapp, Desktop großzügig */
+.page-pad {
+  padding: clamp(1rem, 3vw, 2.5rem);
 }
 
-/* Gap */
-.gap-1  { gap: var(--fs-1);  }
-.gap-2  { gap: var(--fs-2);  }
-.gap-3  { gap: var(--fs-3);  }
-.gap-4  { gap: var(--fs-4);  }
-.gap-5  { gap: var(--fs-5);  }
-.gap-6  { gap: var(--fs-6);  }
-.gap-8  { gap: var(--fs-8);  }
-.gap-10 { gap: var(--fs-10); }
-.gap-12 { gap: var(--fs-12); }
-.gap-x-2  { column-gap: var(--fs-2);  }
-.gap-x-3  { column-gap: var(--fs-3);  }
-.gap-x-4  { column-gap: var(--fs-4);  }
-.gap-x-6  { column-gap: var(--fs-6);  }
-.gap-y-2  { row-gap: var(--fs-2);  }
-.gap-y-3  { row-gap: var(--fs-3);  }
-.gap-y-4  { row-gap: var(--fs-4);  }
-.gap-y-6  { row-gap: var(--fs-6);  }
+/* Haupt-Sektionsabstand (zwischen Sektionen einer Seite) */
+.section-gap {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+}
 
-/* Padding */
-.p-1  { padding: var(--fs-1);  }
-.p-2  { padding: var(--fs-2);  }
-.p-3  { padding: var(--fs-3);  }
-.p-4  { padding: var(--fs-4);  }
-.p-5  { padding: var(--fs-5);  }
-.p-6  { padding: var(--fs-6);  }
-.p-8  { padding: var(--fs-8);  }
-.p-10 { padding: var(--fs-10); }
-.p-12 { padding: var(--fs-12); }
+/* Karten-Grid: fluid von 1 → 2 → 3 Spalten */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: clamp(0.75rem, 2vw, 1.5rem);
+}
 
-.px-1  { padding-inline: var(--fs-1);  }
-.px-2  { padding-inline: var(--fs-2);  }
-.px-3  { padding-inline: var(--fs-3);  }
-.px-4  { padding-inline: var(--fs-4);  }
-.px-5  { padding-inline: var(--fs-5);  }
-.px-6  { padding-inline: var(--fs-6);  }
-.px-8  { padding-inline: var(--fs-8);  }
+/* Inhalts-Grid mit 2 Spalten ab ~640px */
+.content-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 28rem), 1fr));
+  gap: clamp(1rem, 2.5vw, 2rem);
+}
 
-.py-1  { padding-block: var(--fs-1);  }
-.py-2  { padding-block: var(--fs-2);  }
-.py-3  { padding-block: var(--fs-3);  }
-.py-4  { padding-block: var(--fs-4);  }
-.py-5  { padding-block: var(--fs-5);  }
-.py-6  { padding-block: var(--fs-6);  }
-.py-8  { padding-block: var(--fs-8);  }
-
-.pt-1  { padding-top: var(--fs-1);    }
-.pt-2  { padding-top: var(--fs-2);    }
-.pt-3  { padding-top: var(--fs-3);    }
-.pt-4  { padding-top: var(--fs-4);    }
-.pt-6  { padding-top: var(--fs-6);    }
-.pt-8  { padding-top: var(--fs-8);    }
-.pb-1  { padding-bottom: var(--fs-1); }
-.pb-2  { padding-bottom: var(--fs-2); }
-.pb-3  { padding-bottom: var(--fs-3); }
-.pb-4  { padding-bottom: var(--fs-4); }
-.pb-6  { padding-bottom: var(--fs-6); }
-.pb-8  { padding-bottom: var(--fs-8); }
-.pl-2  { padding-left: var(--fs-2);   }
-.pl-3  { padding-left: var(--fs-3);   }
-.pl-4  { padding-left: var(--fs-4);   }
-.pr-2  { padding-right: var(--fs-2);  }
-.pr-3  { padding-right: var(--fs-3);  }
-.pr-4  { padding-right: var(--fs-4);  }
-
-/* Margin */
-.m-1  { margin: var(--fs-1);  }
-.m-2  { margin: var(--fs-2);  }
-.m-3  { margin: var(--fs-3);  }
-.m-4  { margin: var(--fs-4);  }
-.m-6  { margin: var(--fs-6);  }
-.m-8  { margin: var(--fs-8);  }
-
-.mt-1  { margin-top: var(--fs-1);    }
-.mt-2  { margin-top: var(--fs-2);    }
-.mt-3  { margin-top: var(--fs-3);    }
-.mt-4  { margin-top: var(--fs-4);    }
-.mt-6  { margin-top: var(--fs-6);    }
-.mt-8  { margin-top: var(--fs-8);    }
-.mb-1  { margin-bottom: var(--fs-1); }
-.mb-2  { margin-bottom: var(--fs-2); }
-.mb-3  { margin-bottom: var(--fs-3); }
-.mb-4  { margin-bottom: var(--fs-4); }
-.mb-6  { margin-bottom: var(--fs-6); }
-.mb-8  { margin-bottom: var(--fs-8); }
-.ml-1  { margin-left: var(--fs-1);   }
-.ml-2  { margin-left: var(--fs-2);   }
-.ml-3  { margin-left: var(--fs-3);   }
-.ml-4  { margin-left: var(--fs-4);   }
-.mr-1  { margin-right: var(--fs-1);  }
-.mr-2  { margin-right: var(--fs-2);  }
-.mr-3  { margin-right: var(--fs-3);  }
-.mr-4  { margin-right: var(--fs-4);  }
-.-ml-4 { margin-left: calc(var(--fs-4) * -1); }
-.-mt-1 { margin-top:  calc(var(--fs-1) * -1); }
-
-/* Space-Y / Space-X (Tailwind sibling-margin utility) */
-.space-y-1 > * + * { margin-top: var(--fs-1); }
-.space-y-2 > * + * { margin-top: var(--fs-2); }
-.space-y-3 > * + * { margin-top: var(--fs-3); }
-.space-y-4 > * + * { margin-top: var(--fs-4); }
-.space-y-5 > * + * { margin-top: var(--fs-5); }
-.space-y-6 > * + * { margin-top: var(--fs-6); }
-.space-y-8 > * + * { margin-top: var(--fs-8); }
-.space-x-2 > * + * { margin-left: var(--fs-2); }
-.space-x-3 > * + * { margin-left: var(--fs-3); }
-.space-x-4 > * + * { margin-left: var(--fs-4); }
+/* Sektions-Header: Abstand nach unten vor Inhalt */
+.section-header {
+  margin-bottom: clamp(0.75rem, 2vw, 1.5rem);
+}

@@ -629,7 +629,7 @@ export default function LigaPage() {
         )}
       </div>
 
-      <div className="p-4 md:p-6 lg:p-8 space-y-6">
+      <div className="page-pad section-gap">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between gap-4">

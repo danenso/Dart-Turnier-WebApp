@@ -141,8 +141,8 @@ export default function AccountPage() {
   if (!user) return null;
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6">
-      <div>
+    <div className="page-pad">
+      <div className="section-gap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Account</h1>
           <p className="text-zinc-500">Verwalte deine Kontodaten.</p>
