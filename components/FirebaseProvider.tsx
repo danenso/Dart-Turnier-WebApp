@@ -10,6 +10,7 @@ interface FirebaseContextType {
   isAuthReady: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  accessDenied: boolean;
   signIn: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   logOut: () => Promise<void>;
@@ -20,6 +21,7 @@ const FirebaseContext = createContext<FirebaseContextType>({
   isAuthReady: false,
   isAdmin: false,
   isSuperAdmin: false,
+  accessDenied: false,
   signIn: async () => {},
   signInWithEmail: async () => {},
   logOut: async () => {}
@@ -32,6 +34,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -43,6 +46,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         setIsSuperAdmin(false);
         return;
       }
+
+      // Reset accessDenied when a new user signs in
+      setAccessDenied(false);
 
       const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
       const adminUid = process.env.NEXT_PUBLIC_ADMIN_UID;
@@ -61,20 +67,30 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }, { merge: true }).catch((e) => console.error("Failed to set admin role in DB", e));
       } else {
         setIsSuperAdmin(false);
-        getDocFromServer(doc(db, 'users', currentUser.uid))
-          .then((userDoc) => {
+        (async () => {
+          try {
+            const userDoc = await getDocFromServer(doc(db, 'users', currentUser.uid));
             if (userDoc.exists()) {
               setIsAdmin(userDoc.data().role === 'admin');
             } else {
-              // Neuen Nutzer in users-Collection eintragen
-              setDoc(doc(db, 'users', currentUser.uid), {
-                role: 'user',
-                email: currentUser.email
-              }, { merge: true }).catch((e) => console.error("Failed to create user doc", e));
-              setIsAdmin(false);
+              // New user — check invitation
+              const inviteDoc = await getDocFromServer(doc(db, 'invitations', currentUser.email!));
+              if (inviteDoc.exists()) {
+                await setDoc(doc(db, 'users', currentUser.uid), {
+                  role: 'user',
+                  email: currentUser.email
+                }, { merge: true });
+                setIsAdmin(false);
+              } else {
+                // Not invited — deny access
+                setAccessDenied(true);
+                await signOut(auth);
+              }
             }
-          })
-          .catch(() => setIsAdmin(false));
+          } catch {
+            setIsAdmin(false);
+          }
+        })();
       }
     });
 
@@ -82,6 +98,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async () => {
+    setAccessDenied(false);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
@@ -91,6 +108,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithEmail = async (email: string, pass: string) => {
+    setAccessDenied(false);
     try {
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (error) {
@@ -108,7 +126,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <FirebaseContext.Provider value={{ user, isAuthReady, isAdmin, isSuperAdmin, signIn, signInWithEmail, logOut }}>
+    <FirebaseContext.Provider value={{ user, isAuthReady, isAdmin, isSuperAdmin, accessDenied, signIn, signInWithEmail, logOut }}>
       {children}
     </FirebaseContext.Provider>
   );

@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 export default function Home() {
-  const { user, isAuthReady, signIn, signInWithEmail } = useFirebase();
+  const { user, isAuthReady, signIn, signInWithEmail, accessDenied } = useFirebase();
   const router = useRouter();
 
   const [loginEmail, setLoginEmail] = useState("");
@@ -166,6 +166,12 @@ export default function Home() {
               <span className="bg-white dark:bg-zinc-950 px-2 text-zinc-400">oder</span>
             </div>
           </div>
+
+          {accessDenied && (
+            <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
+              Kein Zugang. Deine E-Mail-Adresse ist nicht eingeladen. Bitte wende dich an den Administrator.
+            </div>
+          )}
 
           <Button onClick={signIn} variant="outline" className="w-full gap-2">
             <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true">

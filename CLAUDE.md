@@ -48,6 +48,14 @@ public/           # Statische Assets
 - **`main`** – Produktions-Branch (nur bei Release, löst Auto-Deploy aus)
 - **Nie direkt auf `main` pushen** – main ist mit Hostinger-Produktion verbunden
 
+## Setup auf neuem Gerät
+
+1. `npm install`
+2. `.env.local` anlegen (siehe `.env.example`) und alle Werte eintragen
+3. `npm run dev` starten
+
+Zuletzt eingerichtet: 2026-04-14 auf macOS (danenso)
+
 ## Lokale Entwicklung
 
 ```bash

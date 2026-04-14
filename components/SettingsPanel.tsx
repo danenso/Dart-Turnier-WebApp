@@ -44,6 +44,7 @@ import { useEffect, useRef, useState } from "react";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useFirebase } from "@/components/FirebaseProvider";
+import { InvitationManager } from "@/components/InvitationManager";
 
 function ColorField({
   label,
@@ -123,7 +124,7 @@ export function SettingsPanel() {
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { settings, updateSettings, resetSettings } = useThemeCustomizer();
-  const { user } = useFirebase();
+  const { user, isSuperAdmin } = useFirebase();
   const [mounted, setMounted] = useState(false);
   const [iconSearch, setIconSearch] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -160,6 +161,9 @@ export function SettingsPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Beta-Einladungen (nur SuperAdmin) */}
+      {isSuperAdmin && <InvitationManager />}
+
       {/* Reset */}
       <div className="flex items-center justify-between">
         <div>
