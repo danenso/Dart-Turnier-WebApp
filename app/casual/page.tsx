@@ -427,7 +427,7 @@ export default function CasualGamesPage() {
                     <Trophy className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
                   )}
                   <span
-                    className={`text-sm leading-tight truncate ${
+                    className={`text-base leading-tight truncate ${
                       aWon
                         ? "text-green-600 dark:text-green-400"
                         : bWon
@@ -522,7 +522,7 @@ export default function CasualGamesPage() {
               <div className="min-w-0 text-right">
                 <div className="flex items-center justify-end gap-1">
                   <span
-                    className={`text-sm leading-tight truncate ${
+                    className={`text-base leading-tight truncate ${
                       bWon
                         ? "text-green-600 dark:text-green-400"
                         : aWon

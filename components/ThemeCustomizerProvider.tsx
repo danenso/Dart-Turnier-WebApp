@@ -226,9 +226,8 @@ function applyThemeToDOM(s: ThemeCustomSettings) {
       font-style: ${s.headingStyle};
       font-weight: ${s.headingWeight};
     }
+    /* Nur h1 bekommt eine fluid Größe — h2/h3 behalten ihre Tailwind-Klasse */
     h1 { font-size: clamp(1.5rem, 3.5vw, 2.25rem); }
-    h2 { font-size: clamp(1.25rem, 2.5vw, 1.875rem); }
-    h3 { font-size: clamp(1.05rem, 1.8vw, 1.5rem); }
   `;
 }
 

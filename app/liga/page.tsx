@@ -890,12 +890,20 @@ export default function LigaPage() {
                               )}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-tight">
-                                {entry.name}
+                              <p
+                                className="text-sm text-zinc-900 dark:text-zinc-100 truncate leading-tight"
+                                style={{
+                                  fontFamily: "var(--font-heading, sans-serif)",
+                                  fontWeight: "var(--heading-weight, 700)" as any,
+                                  textTransform: "var(--heading-transform, none)" as any,
+                                  fontStyle: "var(--heading-style, normal)" as any,
+                                }}
+                              >
+                                {player?.nickname || entry.name}
                               </p>
                               {player?.nickname && (
                                 <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate leading-tight">
-                                  &ldquo;{player.nickname}&rdquo;
+                                  {entry.name}
                                 </p>
                               )}
                             </div>

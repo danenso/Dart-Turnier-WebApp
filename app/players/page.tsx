@@ -131,7 +131,7 @@ export default function PlayersPage() {
               const slug = slugify(player.name);
               return (
                 <div key={player.id} className="py-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                  {/* Zeile 1: Avatar + Name + Aktions-Icons */}
+                  {/* Avatar + Name+SongPlayer (zwischen Name und Icons) + Aktions-Icons */}
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
                       {player.avatar ? (
@@ -151,6 +151,17 @@ export default function PlayersPage() {
                       ) : (
                         <h3 className="text-sm leading-tight truncate font-medium">{player.name}</h3>
                       )}
+                      {player.songUrl && (
+                        <div className="mt-1">
+                          <SongPlayer
+                            playerId={player.id}
+                            songUrl={player.songUrl}
+                            songTitle={player.songTitle || 'Unbekannter Titel'}
+                            songArtist={player.songArtist || ''}
+                            className="flex items-center gap-2 w-full"
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <Link href={`/players/${slug}`}>
@@ -167,19 +178,6 @@ export default function PlayersPage() {
                       )}
                     </div>
                   </div>
-
-                  {/* Zeile 2: Song Player (darunter) */}
-                  {player.songUrl && (
-                    <div className="mt-2 pl-13">
-                      <SongPlayer
-                        playerId={player.id}
-                        songUrl={player.songUrl}
-                        songTitle={player.songTitle || 'Unbekannter Titel'}
-                        songArtist={player.songArtist || ''}
-                        className="flex items-center gap-3 w-full"
-                      />
-                    </div>
-                  )}
                 </div>
               );
             })}
