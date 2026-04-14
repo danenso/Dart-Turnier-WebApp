@@ -107,54 +107,59 @@ export default function PlayersPage() {
             {players.map(player => {
               const slug = slugify(player.name);
               return (
-                <div key={player.id} className="flex items-center gap-4 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                  {/* Avatar */}
-                  <div className="w-11 h-11 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
-                    {player.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={player.avatar} alt={player.name} className="w-full h-full object-cover"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                    ) : (
-                      <Icon icon={getIcon('account')} className="w-6 h-6 text-zinc-400" />
-                    )}
-                  </div>
+                <div key={player.id} className="px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    {/* Avatar */}
+                    <div className="w-11 h-11 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
+                      {player.avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={player.avatar} alt={player.name} className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                      ) : (
+                        <Icon icon={getIcon('account')} className="w-6 h-6 text-zinc-400" />
+                      )}
+                    </div>
 
-                  {/* Name / Nickname */}
-                  <div className="flex-1 min-w-0">
-                    {player.nickname ? (
-                      <>
-                        <p className="font-semibold text-sm leading-tight truncate text-zinc-900 dark:text-zinc-50">
-                          {player.nickname}
-                        </p>
-                        <p className="text-xs text-zinc-500 truncate">{player.name}</p>
-                      </>
-                    ) : (
-                      <p className="font-semibold text-sm truncate text-zinc-900 dark:text-zinc-50">
-                        {player.name}
-                      </p>
-                    )}
-                  </div>
+                    {/* Name / Nickname */}
+                    <div className="flex-1 min-w-0">
+                      {player.nickname ? (
+                        <>
+                          <h3 className="text-base leading-tight truncate">{player.nickname}</h3>
+                          <p className="text-xs text-zinc-500 truncate">{player.name}</p>
+                        </>
+                      ) : (
+                        <h3 className="text-base leading-tight truncate">{player.name}</h3>
+                      )}
+                    </div>
 
-                  {/* Song indicator */}
-                  {player.songUrl && (
-                    <Icon icon="mdi:music-note" className="w-4 h-4 text-zinc-400 shrink-0" />
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Link href={`/players/${slug}`}>
-                      <Button variant="ghost" size="icon" title="Statistiken">
-                        <Icon icon={getIcon('standings')} className="w-4 h-4 text-zinc-500" />
-                      </Button>
-                    </Link>
-                    {isAdmin && (
-                      <Link href={`/players/${slug}/edit`}>
-                        <Button variant="ghost" size="icon" title="Bearbeiten">
-                          <Icon icon="mdi:pencil" className="w-4 h-4 text-zinc-500" />
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Link href={`/players/${slug}`}>
+                        <Button variant="ghost" size="icon" title="Statistiken">
+                          <Icon icon={getIcon('standings')} className="w-4 h-4 text-zinc-500" />
                         </Button>
                       </Link>
-                    )}
+                      {isAdmin && (
+                        <Link href={`/players/${slug}/edit`}>
+                          <Button variant="ghost" size="icon" title="Bearbeiten">
+                            <Icon icon="mdi:pencil" className="w-4 h-4 text-zinc-500" />
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Song Player */}
+                  {player.songUrl && (
+                    <div className="mt-2 ml-15 pl-[60px]">
+                      <SongPlayer
+                        playerId={player.id}
+                        songUrl={player.songUrl}
+                        songTitle={player.songTitle || 'Unbekannter Titel'}
+                        songArtist={player.songArtist || ''}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -184,24 +189,22 @@ export default function PlayersPage() {
                     <div className="min-w-0 flex-1">
                       {player.nickname ? (
                         <>
-                          <h3 className="font-bold text-lg leading-tight truncate">{player.nickname}</h3>
+                          <h3 className="text-xl leading-tight truncate">{player.nickname}</h3>
                           <p className="text-sm text-zinc-500 truncate">{player.name}</p>
                         </>
                       ) : (
-                        <h3 className="font-bold text-lg leading-tight truncate">{player.name}</h3>
+                        <h3 className="text-xl leading-tight truncate">{player.name}</h3>
                       )}
                     </div>
                   </div>
 
                   {player.songUrl && (
-                    <div className="-mx-1">
-                      <SongPlayer
-                        playerId={player.id}
-                        songUrl={player.songUrl}
-                        songTitle={player.songTitle || 'Unbekannter Titel'}
-                        songArtist={player.songArtist || ''}
-                      />
-                    </div>
+                    <SongPlayer
+                      playerId={player.id}
+                      songUrl={player.songUrl}
+                      songTitle={player.songTitle || 'Unbekannter Titel'}
+                      songArtist={player.songArtist || ''}
+                    />
                   )}
 
                   <div className="flex items-center gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
