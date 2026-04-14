@@ -24,9 +24,9 @@ export interface ThemeCustomSettings {
 }
 
 export const DEFAULT_THEME_SETTINGS: ThemeCustomSettings = {
-  headingFont: "Inter",
+  headingFont: "Oswald",
   bodyFont: "Inter",
-  headingTransform: "none",
+  headingTransform: "uppercase",
   headingStyle: "normal",
   primaryColor: "#171717",
   primaryFgColor: "#fafafa",
