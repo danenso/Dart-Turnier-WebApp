@@ -33,8 +33,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const topNav = [
+    { name: "Liga",               href: "/liga",        iconKey: "liga"        as const },
     { name: t("nav.tournaments"), href: "/tournaments", iconKey: "tournaments" as const },
-    { name: "Liga",               href: "/liga",    iconKey: "liga"        as const },
     { name: t("nav.casual"),      href: "/casual",  iconKey: "casual"      as const },
     { name: t("nav.players"),     href: "/players", iconKey: "players"     as const },
   ];
