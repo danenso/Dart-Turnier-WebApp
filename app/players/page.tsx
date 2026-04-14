@@ -103,11 +103,11 @@ export default function PlayersPage() {
 
         {/* LIST VIEW */}
         {viewMode === 'list' && players.length > 0 && (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800">
             {players.map(player => {
               const slug = slugify(player.name);
               return (
-                <div key={player.id} className="grid grid-cols-[1fr_2fr_auto] items-center gap-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-lg px-2 transition-colors">
+                <div key={player.id} className="grid grid-cols-[minmax(120px,180px)_1fr_auto] items-center gap-4 py-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
 
                   {/* Spalte 1: Avatar + Name */}
                   <div className="flex items-center gap-3 min-w-0">
@@ -140,6 +140,7 @@ export default function PlayersPage() {
                         songUrl={player.songUrl}
                         songTitle={player.songTitle || 'Unbekannter Titel'}
                         songArtist={player.songArtist || ''}
+                        className="flex items-center gap-3 w-full"
                       />
                     ) : (
                       <span className="text-xs text-zinc-400">–</span>

@@ -9,6 +9,7 @@ interface SongPlayerProps {
   songUrl: string;
   songTitle: string;
   songArtist: string;
+  className?: string;
 }
 
 function formatTime(seconds: number): string {
@@ -18,7 +19,7 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function SongPlayer({ playerId, songUrl, songTitle, songArtist }: SongPlayerProps) {
+export function SongPlayer({ playerId, songUrl, songTitle, songArtist, className }: SongPlayerProps) {
   const { playingSongId, requestPlay, notifyStop } = useAudio();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -83,7 +84,7 @@ export function SongPlayer({ playerId, songUrl, songTitle, songArtist }: SongPla
   };
 
   return (
-    <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg px-3 py-2 w-full">
+    <div className={className ?? "flex items-center gap-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg px-3 py-2 w-full"}>
       <button
         onClick={togglePlay}
         disabled={isLoading}
