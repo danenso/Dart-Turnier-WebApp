@@ -166,6 +166,18 @@ service cloud.firestore {
       }
     }
 
+    // Collection-Group-Query für Spieler-Statistiken
+    // Erlaubt authentifizierten Nutzern Matches zu lesen (geschlossene Beta)
+    match /{path=**}/matches/{matchId} {
+      allow read: if isAuthenticated();
+    }
+
+    // Einladungen (Closed Beta) – nur SuperAdmin darf verwalten
+    match /invitations/{email} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
     match /tournaments/{tournamentId} {
       allow read: if isOwner(resource.data.ownerId) || isAdmin();
       allow create: if isAuthenticated() && isValidTournament(request.resource.data);
