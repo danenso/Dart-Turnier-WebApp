@@ -165,16 +165,17 @@ function simulateLegs(match: any, playerId: string): LegData[] {
 }
 
 export async function fetchPlayerMatches(playerId: string): Promise<MatchStats[]> {
+  // Single-field queries on collectionGroup work without composite index
   const [snapA, snapB] = await Promise.all([
-    getDocs(query(collectionGroup(db, 'matches'), where('playerAId', '==', playerId), where('status', '==', 'completed'))),
-    getDocs(query(collectionGroup(db, 'matches'), where('playerBId', '==', playerId), where('status', '==', 'completed'))),
+    getDocs(query(collectionGroup(db, 'matches'), where('playerAId', '==', playerId))),
+    getDocs(query(collectionGroup(db, 'matches'), where('playerBId', '==', playerId))),
   ]);
 
   const seen = new Set<string>();
   const allDocs = [...snapA.docs, ...snapB.docs].filter(d => {
     if (seen.has(d.id)) return false;
     seen.add(d.id);
-    return true;
+    return d.data().status === 'completed';
   });
 
   const tournamentIds = [...new Set(allDocs.map(d => d.ref.parent.parent!.id))];
