@@ -651,9 +651,10 @@ export default function LigaPage() {
                 setSettingsGames(liga!.gamesPerSeason);
                 setIsSettingsOpen(true);
               }}
+              title="Liga-Einstellungen"
             >
-              <Settings2 className="w-4 h-4 mr-1.5" />
-              Liga-Einstellungen
+              <Settings2 className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Liga-Einstellungen</span>
             </Button>
           )}
         </div>

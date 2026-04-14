@@ -77,7 +77,7 @@ export default function Home() {
           ))}
         </div>
         <div className="relative z-10 text-center">
-          <Icon icon="mdi:bullseye" className="w-20 h-20 mx-auto mb-6 text-red-500" />
+          <Icon icon="mdi:bullseye" className="w-20 h-20 mx-auto mb-6 text-amber-400" />
           <h1 className="text-5xl font-black text-white tracking-tight">Pfeilwurf.de</h1>
           <p className="mt-4 text-zinc-400 text-lg max-w-sm mx-auto leading-relaxed">
             Turniere, Liga &amp; Statistiken –<br />alles für dein Dart-Team
@@ -104,7 +104,7 @@ export default function Home() {
         <div className="w-full max-w-sm">
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex items-center justify-center w-14 h-14 bg-zinc-900 rounded-full mb-4">
-              <Icon icon="mdi:bullseye" className="w-8 h-8 text-red-500" />
+              <Icon icon="mdi:bullseye" className="w-8 h-8 text-amber-400" />
             </div>
             <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Pfeilwurf.de</h1>
           </div>
@@ -149,7 +149,7 @@ export default function Home() {
               />
             </div>
             {loginError && (
-              <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/30 px-3 py-2 rounded-md">
+              <p className="text-sm text-amber-400 bg-red-50 dark:bg-red-950/30 px-3 py-2 rounded-md">
                 {loginError}
               </p>
             )}

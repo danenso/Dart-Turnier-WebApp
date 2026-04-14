@@ -47,7 +47,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
     <html lang="de" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <meta name="theme-color" content="#e11d48" />
+        <meta name="theme-color" content="#D4AF37" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body suppressHydrationWarning>

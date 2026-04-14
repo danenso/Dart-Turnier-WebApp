@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SettingsPanel } from "@/components/SettingsPanel";
 import { auth, db } from "@/lib/firebase";
 import {
   updateProfile,
@@ -25,9 +26,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, Shield, ShieldOff, Info } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+
+type Tab = "profil" | "einstellungen";
 
 export default function AccountPage() {
   const { user, isAdmin, isSuperAdmin, logOut } = useFirebase();
+  const [activeTab, setActiveTab] = useState<Tab>("profil");
   const [playerProfile, setPlayerProfile] = useState<any>(null);
 
   // Profil-Felder
@@ -137,11 +142,36 @@ export default function AccountPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="max-w-2xl mx-auto space-y-8">
+      <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Account</h1>
           <p className="text-zinc-500">Verwalte deine Kontodaten.</p>
         </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
+          {(["profil", "einstellungen"] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all capitalize",
+                activeTab === tab
+                  ? "bg-white dark:bg-zinc-900 shadow-sm text-zinc-900 dark:text-zinc-50"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300",
+              )}
+            >
+              {tab === "profil" ? "Profil" : "Einstellungen"}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "einstellungen" && (
+          <SettingsPanel />
+        )}
+
+        {activeTab === "profil" && (
+          <>
 
         {/* Profil bearbeiten */}
         <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-800 space-y-5">
@@ -311,6 +341,8 @@ export default function AccountPage() {
               })}
             </div>
           </div>
+        )}
+        </> /* end profil tab */
         )}
       </div>
     </div>

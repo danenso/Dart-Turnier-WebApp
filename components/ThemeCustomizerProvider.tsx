@@ -21,6 +21,7 @@ export interface ThemeCustomSettings {
   lightForeground: string;
   darkForeground: string;
   iconLibrary: "mdi" | "lucide" | "tabler" | "ph" | "heroicons";
+  logoUrl: string;
 }
 
 export const DEFAULT_THEME_SETTINGS: ThemeCustomSettings = {
@@ -28,13 +29,14 @@ export const DEFAULT_THEME_SETTINGS: ThemeCustomSettings = {
   bodyFont: "Inter",
   headingTransform: "uppercase",
   headingStyle: "normal",
-  primaryColor: "#171717",
-  primaryFgColor: "#fafafa",
+  primaryColor: "#D4AF37",
+  primaryFgColor: "#1a1a1a",
   secondaryColor: "#f5f5f5",
   secondaryFgColor: "#171717",
   lightForeground: "#0a0a0a",
   darkForeground: "#fafafa",
   iconLibrary: "mdi",
+  logoUrl: "",
 };
 
 // ── Icon map: one entry per semantic slot, one icon-id per library ──────────

@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- Outer ring: dark red -->
-  <circle cx="50" cy="50" r="48" fill="#b91c1c"/>
+  <!-- Outer ring: dark gold -->
+  <circle cx="50" cy="50" r="48" fill="#B8960C"/>
   <!-- Ring 2: white -->
   <circle cx="50" cy="50" r="38" fill="#ffffff"/>
-  <!-- Ring 3: red -->
-  <circle cx="50" cy="50" r="28" fill="#dc2626"/>
+  <!-- Ring 3: gold -->
+  <circle cx="50" cy="50" r="28" fill="#D4AF37"/>
   <!-- Ring 4: white -->
   <circle cx="50" cy="50" r="18" fill="#ffffff"/>
-  <!-- Bull: dark red -->
-  <circle cx="50" cy="50" r="9" fill="#b91c1c"/>
+  <!-- Bull: dark gold -->
+  <circle cx="50" cy="50" r="9" fill="#B8960C"/>
 </svg>

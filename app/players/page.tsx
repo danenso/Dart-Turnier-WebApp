@@ -130,10 +130,9 @@ export default function PlayersPage() {
             {players.map(player => {
               const slug = slugify(player.name);
               return (
-                <div key={player.id} className="grid grid-cols-[minmax(120px,180px)_1fr_auto] items-center gap-4 py-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-
-                  {/* Spalte 1: Avatar + Name */}
-                  <div className="flex items-center gap-3 min-w-0">
+                <div key={player.id} className="py-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                  {/* Zeile 1: Avatar + Name + Aktions-Icons */}
+                  <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
                       {player.avatar ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -143,21 +142,35 @@ export default function PlayersPage() {
                         <Icon icon={getIcon('account')} className="w-5 h-5 text-zinc-400" />
                       )}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       {player.nickname ? (
                         <>
-                          <h3 className="text-sm leading-tight truncate">{player.nickname}</h3>
+                          <h3 className="text-sm leading-tight truncate font-medium">{player.nickname}</h3>
                           <p className="text-xs text-zinc-500 truncate">{player.name}</p>
                         </>
                       ) : (
-                        <h3 className="text-sm leading-tight truncate">{player.name}</h3>
+                        <h3 className="text-sm leading-tight truncate font-medium">{player.name}</h3>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Link href={`/players/${slug}`}>
+                        <Button variant="ghost" size="icon" title="Statistiken">
+                          <Icon icon={getIcon('standings')} className="w-4 h-4 text-zinc-500" />
+                        </Button>
+                      </Link>
+                      {isAdmin && (
+                        <Link href={`/players/${slug}/edit`}>
+                          <Button variant="ghost" size="icon" title="Bearbeiten">
+                            <Icon icon="mdi:pencil" className="w-4 h-4 text-zinc-500" />
+                          </Button>
+                        </Link>
                       )}
                     </div>
                   </div>
 
-                  {/* Spalte 2: Song Player */}
-                  <div className="min-w-0">
-                    {player.songUrl ? (
+                  {/* Zeile 2: Song Player (darunter) */}
+                  {player.songUrl && (
+                    <div className="mt-2 pl-13">
                       <SongPlayer
                         playerId={player.id}
                         songUrl={player.songUrl}
@@ -165,26 +178,8 @@ export default function PlayersPage() {
                         songArtist={player.songArtist || ''}
                         className="flex items-center gap-3 w-full"
                       />
-                    ) : (
-                      <span className="text-xs text-zinc-400">–</span>
-                    )}
-                  </div>
-
-                  {/* Spalte 3: Icons */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Link href={`/players/${slug}`}>
-                      <Button variant="ghost" size="icon" title="Statistiken">
-                        <Icon icon={getIcon('standings')} className="w-4 h-4 text-zinc-500" />
-                      </Button>
-                    </Link>
-                    {isAdmin && (
-                      <Link href={`/players/${slug}/edit`}>
-                        <Button variant="ghost" size="icon" title="Bearbeiten">
-                          <Icon icon="mdi:pencil" className="w-4 h-4 text-zinc-500" />
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
