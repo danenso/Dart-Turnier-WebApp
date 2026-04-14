@@ -969,7 +969,7 @@ export default function MatchPage() {
             className="text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800"
             onClick={() =>
               router.push(
-                tournament?.type === "single_match" ? "/" : `/tournament/${id}`,
+                tournament?.type === "single_match" ? "/casual" : `/tournament/${id}`,
               )
             }
           >
@@ -1035,7 +1035,7 @@ export default function MatchPage() {
                 }
               >
                 {tournament?.type === "single_match"
-                  ? "Zurück zum Dashboard"
+                  ? "Zurück zu Freies Spiel"
                   : "Zum Turnier"}
               </Button>
               {nextMatchId && (

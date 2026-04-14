@@ -90,7 +90,7 @@ export default function TournamentPage() {
         if (docSnap.exists()) {
           setTournament({ id: docSnap.id, ...docSnap.data() });
         } else {
-          router.push("/");
+          router.push("/tournaments");
         }
       },
       (error) =>
@@ -600,7 +600,7 @@ export default function TournamentPage() {
     if (!isAdmin) return;
     try {
       await deleteDoc(doc(db, "tournaments", id));
-      router.push("/");
+      router.push("/tournaments");
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `tournaments/${id}`);
     }
@@ -614,10 +614,10 @@ export default function TournamentPage() {
         <div className="max-w-5xl mx-auto space-y-6">
           <Button
             variant="ghost"
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/casual")}
             className="-ml-4 mb-2"
           >
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+            <ArrowLeft className="mr-2 h-4 w-4" /> Zurück zu Freies Spiel
           </Button>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -687,10 +687,10 @@ export default function TournamentPage() {
       <div className="max-w-5xl mx-auto space-y-6">
         <Button
           variant="ghost"
-          onClick={() => router.push("/")}
+          onClick={() => router.push("/tournaments")}
           className="-ml-4 mb-2"
         >
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+          <ArrowLeft className="mr-2 h-4 w-4" /> Zurück zu Turnieren
         </Button>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
