@@ -103,63 +103,64 @@ export default function PlayersPage() {
 
         {/* LIST VIEW */}
         {viewMode === 'list' && players.length > 0 && (
-          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {players.map(player => {
               const slug = slugify(player.name);
               return (
-                <div key={player.id} className="px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    {/* Avatar */}
-                    <div className="w-11 h-11 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
+                <div key={player.id} className="grid grid-cols-[1fr_2fr_auto] items-center gap-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-lg px-2 transition-colors">
+
+                  {/* Spalte 1: Avatar + Name */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
                       {player.avatar ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={player.avatar} alt={player.name} className="w-full h-full object-cover"
                           onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                       ) : (
-                        <Icon icon={getIcon('account')} className="w-6 h-6 text-zinc-400" />
+                        <Icon icon={getIcon('account')} className="w-5 h-5 text-zinc-400" />
                       )}
                     </div>
-
-                    {/* Name / Nickname */}
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0">
                       {player.nickname ? (
                         <>
-                          <h3 className="text-base leading-tight truncate">{player.nickname}</h3>
+                          <h3 className="text-sm leading-tight truncate">{player.nickname}</h3>
                           <p className="text-xs text-zinc-500 truncate">{player.name}</p>
                         </>
                       ) : (
-                        <h3 className="text-base leading-tight truncate">{player.name}</h3>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Link href={`/players/${slug}`}>
-                        <Button variant="ghost" size="icon" title="Statistiken">
-                          <Icon icon={getIcon('standings')} className="w-4 h-4 text-zinc-500" />
-                        </Button>
-                      </Link>
-                      {isAdmin && (
-                        <Link href={`/players/${slug}/edit`}>
-                          <Button variant="ghost" size="icon" title="Bearbeiten">
-                            <Icon icon="mdi:pencil" className="w-4 h-4 text-zinc-500" />
-                          </Button>
-                        </Link>
+                        <h3 className="text-sm leading-tight truncate">{player.name}</h3>
                       )}
                     </div>
                   </div>
 
-                  {/* Song Player */}
-                  {player.songUrl && (
-                    <div className="mt-2 ml-15 pl-[60px]">
+                  {/* Spalte 2: Song Player */}
+                  <div className="min-w-0">
+                    {player.songUrl ? (
                       <SongPlayer
                         playerId={player.id}
                         songUrl={player.songUrl}
                         songTitle={player.songTitle || 'Unbekannter Titel'}
                         songArtist={player.songArtist || ''}
                       />
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-xs text-zinc-400">–</span>
+                    )}
+                  </div>
+
+                  {/* Spalte 3: Icons */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Link href={`/players/${slug}`}>
+                      <Button variant="ghost" size="icon" title="Statistiken">
+                        <Icon icon={getIcon('standings')} className="w-4 h-4 text-zinc-500" />
+                      </Button>
+                    </Link>
+                    {isAdmin && (
+                      <Link href={`/players/${slug}/edit`}>
+                        <Button variant="ghost" size="icon" title="Bearbeiten">
+                          <Icon icon="mdi:pencil" className="w-4 h-4 text-zinc-500" />
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
                 </div>
               );
             })}
