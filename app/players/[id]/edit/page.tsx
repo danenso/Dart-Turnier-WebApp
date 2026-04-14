@@ -8,7 +8,7 @@ import { db, secondaryAuth } from "@/lib/firebase";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-errors";
 import { processAvatarToBase64, AvatarUploadError } from "@/lib/avatar-upload";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, updateDoc, deleteDoc, setDoc, where } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { uploadSong, SongUploadError } from "@/lib/song-upload";
+import { slugify } from "@/lib/slugify";
 import { ArrowLeft, Trash2, Upload, User, Music2, X, Shield } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -63,10 +64,14 @@ export default function PlayerEditPage() {
 
     const fetchPlayer = async () => {
       try {
-        const docSnap = await getDoc(doc(db, "players", id));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setPlayer({ id: docSnap.id, ...data });
+        // Slug-basierter Lookup: alle Spieler des Admins laden und per Slug filtern
+        const snap = await getDocs(
+          query(collection(db, "players"), where("ownerId", "==", user.uid))
+        );
+        const found = snap.docs.find(d => slugify(d.data().name) === id);
+        if (found) {
+          const data = found.data();
+          setPlayer({ id: found.id, ...data });
           setName(data.name || "");
           setNickname(data.nickname || "");
           setEmail(data.email || "");
