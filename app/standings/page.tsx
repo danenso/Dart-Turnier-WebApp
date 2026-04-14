@@ -158,8 +158,8 @@ export default function StandingsPage() {
   const finalTournament = tournaments.find((t) => t.isFinalTournament);
 
   return (
-    <div className="p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
+    <div className="p-4 md:p-6 lg:p-8 space-y-8">
+      <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Rangliste</h1>

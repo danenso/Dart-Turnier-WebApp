@@ -53,6 +53,7 @@ export const ICON_MAP = {
   settings:   { mdi: "mdi:cog",                  lucide: "lucide:settings",       tabler: "tabler:settings",       ph: "ph:gear",               heroicons: "heroicons:cog-6-tooth" },
   account:    { mdi: "mdi:account",              lucide: "lucide:user",           tabler: "tabler:user",           ph: "ph:user",               heroicons: "heroicons:user" },
   signout:    { mdi: "mdi:logout",               lucide: "lucide:log-out",        tabler: "tabler:logout",         ph: "ph:sign-out",           heroicons: "heroicons:arrow-right-on-rectangle" },
+  bot:        { mdi: "mdi:robot",                lucide: "lucide:bot",            tabler: "tabler:robot",          ph: "ph:robot",              heroicons: "heroicons:cpu-chip" },
 } satisfies Record<string, Record<ThemeCustomSettings["iconLibrary"], string>>;
 
 export type IconKey = keyof typeof ICON_MAP;
@@ -203,6 +204,9 @@ function applyThemeToDOM(s: ThemeCustomSettings) {
     :root {
       --font-sans: "${s.bodyFont}", system-ui, sans-serif;
       --font-heading: "${s.headingFont}", system-ui, sans-serif;
+      --heading-weight: ${s.headingWeight};
+      --heading-transform: ${s.headingTransform};
+      --heading-style: ${s.headingStyle};
       --primary: ${s.primaryColor};
       --primary-foreground: ${s.primaryFgColor};
       --secondary: ${s.secondaryColor};
@@ -216,15 +220,15 @@ function applyThemeToDOM(s: ThemeCustomSettings) {
       --primary-foreground: ${s.primaryFgColor};
       --foreground: ${s.darkForeground};
     }
-    :root {
-      --heading-weight: ${s.headingWeight};
-    }
     h1, h2, h3, h4, h5, h6 {
       font-family: var(--font-heading, var(--font-sans));
       text-transform: ${s.headingTransform};
       font-style: ${s.headingStyle};
       font-weight: ${s.headingWeight};
     }
+    h1 { font-size: clamp(1.5rem, 3.5vw, 2.25rem); }
+    h2 { font-size: clamp(1.25rem, 2.5vw, 1.875rem); }
+    h3 { font-size: clamp(1.05rem, 1.8vw, 1.5rem); }
   `;
 }
 
@@ -244,6 +248,7 @@ export function ThemeCustomizerProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed: Partial<ThemeCustomSettings> = JSON.parse(stored);
+        // Merge with defaults so new fields (e.g. headingWeight) always have a value
         setSettings({ ...DEFAULT_THEME_SETTINGS, ...parsed });
       }
     } catch {

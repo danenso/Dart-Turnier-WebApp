@@ -1,6 +1,7 @@
 "use client";
 
 import { useFirebase } from "@/components/FirebaseProvider";
+import { Icon } from "@iconify/react";
 import { useAppIcon } from "@/components/ThemeCustomizerProvider";
 import { Button } from "@/components/ui/button";
 import {
@@ -332,6 +333,13 @@ export default function CasualGamesPage() {
 
   if (!user) return null;
 
+  const headlineStyle: React.CSSProperties = {
+    fontFamily: "var(--font-heading, sans-serif)",
+    fontWeight: "var(--heading-weight, 700)" as any,
+    textTransform: "var(--heading-transform, none)" as any,
+    fontStyle: "var(--heading-style, normal)" as any,
+  };
+
   const PlayerAvatar = ({
     playerId,
     size = "md",
@@ -339,14 +347,21 @@ export default function CasualGamesPage() {
     playerId?: string;
     size?: "sm" | "md" | "lg";
   }) => {
-    const player = playerId ? getPlayerInfo(playerId) : null;
+    const isBot = playerId === BOT_PLAYER_ID;
+    const player = (!isBot && playerId) ? getPlayerInfo(playerId) : null;
     const sizeMap = { sm: "w-8 h-8", md: "w-10 h-10", lg: "w-12 h-12" };
     const iconMap = { sm: "w-4 h-4", md: "w-5 h-5", lg: "w-6 h-6" };
     return (
       <div
-        className={`${sizeMap[size]} rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0`}
+        className={`${sizeMap[size]} rounded-full flex items-center justify-center overflow-hidden border shrink-0 ${
+          isBot
+            ? "bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700"
+            : "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+        }`}
       >
-        {player?.avatar ? (
+        {isBot ? (
+          <Icon icon={getIcon("bot")} className={`${iconMap[size]} text-amber-500`} />
+        ) : player?.avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={player.avatar}
@@ -422,7 +437,7 @@ export default function CasualGamesPage() {
                             ? "text-orange-500"
                             : "text-zinc-900 dark:text-zinc-100"
                     }`}
-                    style={playerA?.nickname ? { fontFamily: "var(--font-heading, sans-serif)", fontWeight: "var(--heading-weight, 700)" } : { fontWeight: 600 }}
+                    style={headlineStyle}
                   >
                     {playerA?.nickname || matchData?.playerAName || "—"}
                   </span>
@@ -517,7 +532,7 @@ export default function CasualGamesPage() {
                             ? "text-orange-500"
                             : "text-zinc-900 dark:text-zinc-100"
                     }`}
-                    style={playerB?.nickname ? { fontFamily: "var(--font-heading, sans-serif)", fontWeight: "var(--heading-weight, 700)" } : { fontWeight: 600 }}
+                    style={headlineStyle}
                   >
                     {playerB?.nickname || matchData?.playerBName || "—"}
                   </span>
@@ -635,12 +650,12 @@ export default function CasualGamesPage() {
                   <div>
                     <span
                       className="text-xs text-zinc-700 dark:text-zinc-300"
-                      style={player?.nickname ? { fontFamily: "var(--font-heading, sans-serif)", fontWeight: "var(--heading-weight, 700)" } : { fontWeight: 500 }}
+                      style={headlineStyle}
                     >
                       {player?.nickname || playerNames[i] || player?.name || "—"}
                     </span>
                     {player?.nickname && (
-                      <span className="text-[10px] text-zinc-400 ml-1">
+                      <span className="text-[10px] text-zinc-400 ml-1 normal-case" style={{ fontFamily: "inherit", fontWeight: "normal", textTransform: "none", fontStyle: "normal" }}>
                         {playerNames[i] || player?.name}
                       </span>
                     )}
@@ -684,8 +699,8 @@ export default function CasualGamesPage() {
   const gameToDelete = casualGames.find((g) => g.id === deleteConfirmId);
 
   return (
-    <div className="p-4 md:p-8">
-      <div className="max-w-3xl mx-auto space-y-8">
+    <div className="p-4 md:p-6 lg:p-8 space-y-8">
+      <div>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>

@@ -610,8 +610,8 @@ export default function TournamentPage() {
 
   if (tournament.type === "casual_tiebreak") {
     return (
-      <div className="p-4 md:p-8">
-        <div className="max-w-5xl mx-auto space-y-6">
+      <div className="p-4 md:p-6 lg:p-8 space-y-6">
+        <div>
           <Button
             variant="ghost"
             onClick={() => router.push("/casual")}
@@ -683,8 +683,8 @@ export default function TournamentPage() {
   }
 
   return (
-    <div className="p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6">
+      <div>
         <Button
           variant="ghost"
           onClick={() => router.push("/tournaments")}

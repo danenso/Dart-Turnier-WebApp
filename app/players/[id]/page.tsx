@@ -41,8 +41,8 @@ export default function PlayerStatsPage() {
   if (!isAuthReady || !playerProfile) return <div className="p-8">Loading...</div>;
 
   return (
-    <div className="p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="p-4 md:p-6 lg:p-8 space-y-8">
+      <div>
         <div className="flex items-center gap-4">
           <Link href="/players">
             <Button variant="ghost" size="icon">
