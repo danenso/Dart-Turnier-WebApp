@@ -141,6 +141,7 @@ export default function PlayerEditPage() {
       }
 
       // If email and password are provided and no authUid exists, create a user
+      let invitationSent = false;
       if (email && password && !authUid && isAdmin) {
         const userCredential = await createUserWithEmailAndPassword(
           secondaryAuth,
@@ -148,6 +149,18 @@ export default function PlayerEditPage() {
           password,
         );
         authUid = userCredential.user.uid;
+
+        // Einladungsmail senden
+        try {
+          const res = await fetch("/api/send-invitation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerName: name, email, password }),
+          });
+          if (res.ok) invitationSent = true;
+        } catch {
+          // Mail-Fehler sind nicht kritisch – Speichern geht weiter
+        }
       }
 
       // Song hochladen falls neue Datei ausgewählt
@@ -192,7 +205,11 @@ export default function PlayerEditPage() {
         }, { merge: true });
       }
 
-      router.push("/players");
+      if (invitationSent) {
+        router.push("/players?invited=1");
+      } else {
+        router.push("/players");
+      }
     } catch (error) {
       console.error("Error updating player:", error);
       alert("Failed to update player. " + (error as Error).message);

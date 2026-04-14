@@ -11,6 +11,7 @@ import { SongPlayer } from '@/components/SongPlayer';
 import { Icon } from '@iconify/react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 type ViewMode = 'list' | 'card';
 
@@ -19,6 +20,16 @@ export default function PlayersPage() {
   const getIcon = useAppIcon();
   const [players, setPlayers] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const searchParams = useSearchParams();
+  const [showInvitedBanner, setShowInvitedBanner] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('invited') === '1') {
+      setShowInvitedBanner(true);
+      const t = setTimeout(() => setShowInvitedBanner(false), 6000);
+      return () => clearTimeout(t);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const stored = localStorage.getItem('players-view-mode');
@@ -55,6 +66,18 @@ export default function PlayersPage() {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
+
+        {/* Einladungsbestätigung */}
+        {showInvitedBanner && (
+          <div className="flex items-center gap-3 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 rounded-xl px-5 py-4">
+            <span className="text-xl">🎯</span>
+            <div>
+              <p className="font-semibold text-sm">Einladung verschickt!</p>
+              <p className="text-sm opacity-80">Der Spieler hat eine Willkommens-E-Mail mit seinen Zugangsdaten erhalten.</p>
+            </div>
+            <button onClick={() => setShowInvitedBanner(false)} className="ml-auto text-green-600 dark:text-green-400 hover:opacity-70">✕</button>
+          </div>
+        )}
 
         {/* Header */}
         <div className="flex items-center justify-between">
