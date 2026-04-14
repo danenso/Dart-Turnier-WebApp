@@ -21,6 +21,7 @@ import {
 import { ArrowLeft, Radius, Undo2, ChevronRight, Volume2, VolumeX } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { BOT_PLAYER_ID, generateAITurn, AI_DIFFICULTY_LABELS, type AIDifficulty } from "@/lib/ai-player";
 
 type Multiplier = "single" | "double" | "triple";
 
@@ -44,7 +45,10 @@ export default function MatchPage() {
   const [playerAProfile, setPlayerAProfile] = useState<any>(null);
   const [playerBProfile, setPlayerBProfile] = useState<any>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [aiThinking, setAiThinking] = useState(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const submitTurnRef = useRef<typeof submitTurn | null>(null);
+  const aiThinkingRef = useRef(false);
 
   useEffect(() => {
     if (!isAuthReady || !user || !id || !matchId) return;
@@ -517,6 +521,47 @@ export default function MatchPage() {
     }
   };
 
+  // Ref immer auf die frische submitTurn-Instanz zeigen lassen
+  submitTurnRef.current = submitTurn;
+
+  // ── KI-Zug automatisch ausführen ─────────────────────────────────────────
+  useEffect(() => {
+    if (!match || !tournament?.isVsAI) return;
+    if (match.status !== "in_progress") return;
+    if (match.currentTurnId !== BOT_PLAYER_ID) return;
+    if (aiThinkingRef.current) return;
+
+    aiThinkingRef.current = true;
+    setAiThinking(true);
+
+    // KI "denkt" kurz nach (Realismus)
+    const thinkTime = 900 + Math.random() * 900;
+    const timeout = setTimeout(async () => {
+      const difficulty: AIDifficulty = tournament.aiDifficulty ?? "medium";
+      const rest = match.playerBRest;
+
+      const result = generateAITurn(
+        rest,
+        difficulty,
+        tournament.allowSingleOut || false,
+        tournament.allowDoubleOut !== false,
+        tournament.allowTripleOut || false,
+      );
+
+      if (submitTurnRef.current) {
+        await submitTurnRef.current(result.darts, result.isBust, result.isCheckout, result.newRest);
+      }
+
+      setAiThinking(false);
+      aiThinkingRef.current = false;
+    }, thinkTime);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.currentTurnId, match?.status, tournament?.isVsAI]);
+
   const handleUndo = async () => {
     if (currentDarts.length > 0) {
       setCurrentDarts(currentDarts.slice(0, -1));
@@ -555,12 +600,14 @@ export default function MatchPage() {
     const venueLabel = isSingleMatch
       ? "Freispiel"
       : tournament?.name ?? "Turnier";
+    const isVsAI = tournament?.isVsAI === true;
 
     const renderPlayerCard = (isA: boolean) => {
       const profile = isA ? playerAProfile : playerBProfile;
       const playerId = isA ? match.playerAId : match.playerBId;
       const playerName = isA ? match.playerAName : match.playerBName;
       const animClass = isA ? "match-slide-left" : "match-slide-right";
+      const isBot = playerId === BOT_PLAYER_ID;
 
       return (
         <div
@@ -568,13 +615,15 @@ export default function MatchPage() {
           style={{ animationDelay: "0.1s" }}
         >
           {/* Avatar */}
-          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-zinc-900/15 dark:border-white/20 shadow-2xl bg-zinc-300 dark:bg-zinc-700 shrink-0">
-            {profile?.avatar ? (
-              <img
-                src={profile.avatar}
-                alt={playerName}
-                className="w-full h-full object-cover"
-              />
+          <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 shadow-2xl shrink-0 ${
+            isBot
+              ? "border-amber-400/50 bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center"
+              : "border-zinc-900/15 dark:border-white/20 bg-zinc-300 dark:bg-zinc-700"
+          }`}>
+            {isBot ? (
+              <span className="text-5xl md:text-6xl select-none">🤖</span>
+            ) : profile?.avatar ? (
+              <img src={profile.avatar} alt={playerName} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-3xl md:text-4xl font-bold text-zinc-500 dark:text-white/60">
                 {playerName?.[0]?.toUpperCase() ?? "?"}
@@ -582,28 +631,34 @@ export default function MatchPage() {
             )}
           </div>
 
+          {isBot && tournament?.aiDifficulty && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium px-3 py-1 bg-amber-50 dark:bg-amber-950/40 rounded-full border border-amber-200 dark:border-amber-800">
+              {AI_DIFFICULTY_LABELS[tournament.aiDifficulty as AIDifficulty]}
+            </p>
+          )}
+
           {/* Nickname */}
-          {profile?.nickname && (
+          {!isBot && profile?.nickname && (
             <p className="text-sm md:text-base text-zinc-500 dark:text-zinc-400 italic tracking-wide truncate max-w-full px-2">
               &ldquo;{profile.nickname}&rdquo;
             </p>
           )}
 
-          {/* Name als Button */}
+          {/* Name als Button — Bot-Karte startet immer mit Mensch */}
           <button
-            onClick={() => setStarter(playerId)}
-            className="group relative w-full px-6 py-3 md:px-8 md:py-4 rounded-xl font-bold text-base md:text-lg
-              text-zinc-800 dark:text-white
-              bg-zinc-900/8 border border-zinc-900/15 hover:bg-zinc-900/15 hover:border-zinc-900/25
-              dark:bg-white/10 dark:border-white/20 dark:hover:bg-white/20 dark:hover:border-white/40
-              active:scale-95 transition-all duration-200 shadow-lg
-              focus:outline-none focus:ring-2 focus:ring-zinc-900/25 dark:focus:ring-white/40"
+            onClick={() => isBot ? setStarter(match.playerAId) : setStarter(playerId)}
+            className={`group relative w-full px-6 py-3 md:px-8 md:py-4 rounded-xl font-bold text-base md:text-lg
+              active:scale-95 transition-all duration-200 shadow-lg focus:outline-none
+              ${isBot
+                ? "text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-400/40 hover:bg-amber-500/20 hover:border-amber-400/60 focus:ring-2 focus:ring-amber-400/40"
+                : "text-zinc-800 dark:text-white bg-zinc-900/8 border border-zinc-900/15 hover:bg-zinc-900/15 hover:border-zinc-900/25 dark:bg-white/10 dark:border-white/20 dark:hover:bg-white/20 dark:hover:border-white/40 focus:ring-2 focus:ring-zinc-900/25 dark:focus:ring-white/40"
+              }`}
           >
             <span className="relative z-10">{playerName}</span>
           </button>
 
           {/* Song Player */}
-          {profile?.songUrl && (
+          {!isBot && profile?.songUrl && (
             <div className="w-full mt-1">
               <SongPlayer
                 playerId={playerId}
@@ -785,14 +840,23 @@ export default function MatchPage() {
       </div>
     );
 
+    const isBot = (isPlayerA ? match.playerAId : match.playerBId) === BOT_PLAYER_ID;
+
     const avatarEl = (size: "sm" | "md" | "lg") => {
       const cls =
         size === "sm" ? "w-12 h-12" :
         size === "md" ? "w-14 h-14" :
         "w-16 h-16";
+      const fontSize = size === "sm" ? "text-2xl" : size === "md" ? "text-3xl" : "text-4xl";
       return (
-        <div className={`${cls} rounded-full overflow-hidden bg-zinc-300 dark:bg-zinc-700 shrink-0 border-2 ${isActive ? "border-blue-400/50" : "border-zinc-300 dark:border-zinc-600"}`}>
-          {profile?.avatar ? (
+        <div className={`${cls} rounded-full overflow-hidden shrink-0 border-2 ${
+          isBot
+            ? "bg-amber-50 dark:bg-amber-950/40 border-amber-400/50 flex items-center justify-center"
+            : `bg-zinc-300 dark:bg-zinc-700 ${isActive ? "border-blue-400/50" : "border-zinc-300 dark:border-zinc-600"}`
+        }`}>
+          {isBot ? (
+            <span className={`${fontSize} select-none`}>🤖</span>
+          ) : profile?.avatar ? (
             <img src={profile.avatar} alt={name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center font-bold text-lg text-zinc-600 dark:text-zinc-300">
@@ -878,6 +942,16 @@ export default function MatchPage() {
             isActive ? "bg-blue-400" : "bg-transparent"
           }`}
         />
+
+        {/* KI denkt… Overlay */}
+        {isBot && isActive && aiThinking && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-amber-50/80 dark:bg-amber-950/60 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-2 px-4 py-3 bg-white dark:bg-zinc-900 rounded-xl border border-amber-300 dark:border-amber-700 shadow-lg">
+              <span className="text-2xl animate-bounce">🤖</span>
+              <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">KI denkt…</span>
+            </div>
+          </div>
+        )}
 
         {/* ── Mobile layout ── */}
         <div className="flex md:hidden flex-col h-full px-3 py-2.5 pl-4 gap-2">

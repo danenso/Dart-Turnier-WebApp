@@ -36,6 +36,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-errors";
+import { BOT_PLAYER_ID, type AIDifficulty, getBotName, AI_DIFFICULTY_LABELS } from "@/lib/ai-player";
 
 export default function CasualGamesPage() {
   const { user, isAuthReady, isAdmin } = useFirebase();
@@ -62,6 +63,8 @@ export default function CasualGamesPage() {
   const [singleAllowDoubleOut, setSingleAllowDoubleOut] = useState(true);
   const [singleAllowTripleOut, setSingleAllowTripleOut] = useState(false);
   const [singleAllowDraw, setSingleAllowDraw] = useState(false);
+  const [isVsAI, setIsVsAI] = useState(false);
+  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>("medium");
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
@@ -161,8 +164,10 @@ export default function CasualGamesPage() {
     setFormError("");
 
     if (casualGameType === "single_match") {
-      if (!player1Id || !player2Id) return;
-      if (player1Id === player2Id) {
+      const effectivePlayer2Id = isVsAI ? BOT_PLAYER_ID : player2Id;
+
+      if (!player1Id || !effectivePlayer2Id) return;
+      if (!isVsAI && player1Id === player2Id) {
         setFormError("Bitte zwei verschiedene Spieler auswählen.");
         return;
       }
@@ -170,12 +175,13 @@ export default function CasualGamesPage() {
       setIsCreating(true);
       try {
         const p1 = players.find((p) => p.id === player1Id);
-        const p2 = players.find((p) => p.id === player2Id);
+        const p2Name = isVsAI ? getBotName(aiDifficulty) : players.find((p) => p.id === player2Id)?.name;
+        const p2 = isVsAI ? null : players.find((p) => p.id === player2Id);
 
-        if (!p1 || !p2) return;
+        if (!p1 || (!isVsAI && !p2)) return;
 
         const docRef = await addDoc(collection(db, "tournaments"), {
-          title: `Single Match: ${p1.name} vs ${p2.name}`,
+          title: `Single Match: ${p1.name} vs ${p2Name}`,
           status: "single_match",
           type: "single_match",
           allowSingleOut: singleAllowSingleOut,
@@ -184,6 +190,7 @@ export default function CasualGamesPage() {
           allowDraw: singleAllowDraw,
           createdAt: new Date().toISOString(),
           ownerId: user.uid,
+          ...(isVsAI ? { aiDifficulty, isVsAI: true } : {}),
         });
 
         const format = `${singleMatchFormat}_bo${singleMatchBestOf}`;
@@ -194,9 +201,9 @@ export default function CasualGamesPage() {
           {
             phase: "final",
             playerAId: p1.id,
-            playerBId: p2.id,
+            playerBId: effectivePlayer2Id,
             playerAName: p1.name,
-            playerBName: p2.name,
+            playerBName: p2Name,
             playerALegs: 0,
             playerBLegs: 0,
             currentLeg: 1,
@@ -759,22 +766,71 @@ export default function CasualGamesPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="grid gap-2">
-                      <Label>Spieler 2</Label>
-                      <select
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        value={player2Id}
-                        onChange={(e) => setPlayer2Id(e.target.value)}
+                    {/* KI-Toggle */}
+                    <div className="flex items-center gap-3 py-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsVsAI(!isVsAI)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          isVsAI ? "bg-amber-500" : "bg-zinc-200 dark:bg-zinc-700"
+                        }`}
                       >
-                        <option value="">Spieler 2 wählen</option>
-                        {players.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                            {p.nickname ? ` (${p.nickname})` : ""}
-                          </option>
-                        ))}
-                      </select>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isVsAI ? "translate-x-6" : "translate-x-1"}`} />
+                      </button>
+                      <Label className="cursor-pointer font-normal" onClick={() => setIsVsAI(!isVsAI)}>
+                        🤖 Gegen KI spielen
+                      </Label>
                     </div>
+
+                    {isVsAI ? (
+                      /* Schwierigkeitsstufen */
+                      <div className="grid gap-2">
+                        <Label>Schwierigkeitsstufe</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(["easy", "medium", "hard"] as AIDifficulty[]).map((level) => {
+                            const icons = { easy: "🎯", medium: "⚡", hard: "🏆" };
+                            const descs = { easy: "Für Einsteiger", medium: "Ausgewogen", hard: "Herausfordernd" };
+                            return (
+                              <button
+                                key={level}
+                                type="button"
+                                onClick={() => setAiDifficulty(level)}
+                                className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-sm transition-all ${
+                                  aiDifficulty === level
+                                    ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 font-semibold"
+                                    : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
+                                }`}
+                              >
+                                <span className="text-2xl">{icons[level]}</span>
+                                <span className="font-medium">{AI_DIFFICULTY_LABELS[level]}</span>
+                                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 text-center leading-tight">{descs[level]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                          <span>🤖</span>
+                          <span>Gegner: <strong>{getBotName(aiDifficulty)}</strong> — die KI wirft automatisch.</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid gap-2">
+                        <Label>Spieler 2</Label>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          value={player2Id}
+                          onChange={(e) => setPlayer2Id(e.target.value)}
+                        >
+                          <option value="">Spieler 2 wählen</option>
+                          {players.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                              {p.nickname ? ` (${p.nickname})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div className="grid gap-2 mt-2">
                       <Label>Format</Label>
@@ -922,7 +978,7 @@ export default function CasualGamesPage() {
                   disabled={
                     isCreating ||
                     (casualGameType === "single_match" &&
-                      (!player1Id || !player2Id || player1Id === player2Id)) ||
+                      (!player1Id || (!isVsAI && (!player2Id || player1Id === player2Id)))) ||
                     (casualGameType === "tiebreak" &&
                       tiebreakPlayerIds.length < 2)
                   }
