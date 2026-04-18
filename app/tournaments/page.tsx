@@ -429,23 +429,19 @@ export default function TournamentsPage() {
 
                   {/* Dartscheiben */}
                   <div className="grid gap-2 pt-2 border-t">
-                    <Label>Dartscheiben</Label>
-                    <div className="flex flex-wrap gap-2">
+                    <Label htmlFor="boards">Dartscheiben</Label>
+                    <select
+                      id="boards"
+                      value={numberOfBoards}
+                      onChange={(e) => setNumberOfBoards(Number(e.target.value))}
+                      className="border border-zinc-200 rounded-md px-3 py-2 text-sm bg-white dark:bg-zinc-900 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500"
+                    >
                       {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() => setNumberOfBoards(n)}
-                          className={`w-10 h-10 rounded-lg text-sm font-bold transition-colors ${
-                            numberOfBoards === n
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                          }`}
-                        >
-                          {n}
-                        </button>
+                        <option key={n} value={n}>
+                          {n} Dartscheibe{n === 1 ? "" : "n"}
+                        </option>
                       ))}
-                    </div>
+                    </select>
                     <p className="text-xs text-zinc-400">
                       Wie viele Dartscheiben stehen gleichzeitig zur Verfügung?
                     </p>
