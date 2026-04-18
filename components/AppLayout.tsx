@@ -4,7 +4,7 @@ import { useFirebase } from "@/components/FirebaseProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAppIcon, useThemeCustomizer } from "@/components/ThemeCustomizerProvider";
 import { Icon } from "@iconify/react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,12 @@ import { db } from "@/lib/firebase";
 import { ChallengeNotification } from "./ChallengeNotification";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
+interface LigaSidebarItem {
+  id: string;
+  name: string;
+  abbreviation?: string;
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthReady, logOut } = useFirebase();
   const { t } = useLanguage();
@@ -22,6 +28,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [playerAvatar, setPlayerAvatar] = useState<string>("");
+  const [ligen, setLigen] = useState<LigaSidebarItem[]>([]);
+  const [ligaExpanded, setLigaExpanded] = useState(true);
 
   const isMatchPage = pathname?.includes("/match/");
 
@@ -32,6 +40,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const unsub = onSnapshot(q, (snap) => {
       if (!snap.empty) setPlayerAvatar(snap.docs[0].data().avatar || "");
       else setPlayerAvatar("");
+    });
+    return () => unsub();
+  }, [user]);
+
+  // Load liga list for sidebar
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "liga"), where("ownerId", "==", user.uid));
+    const unsub = onSnapshot(q, (snap) => {
+      const docs = snap.docs
+        .map((d) => ({ id: d.id, name: d.data().name, abbreviation: d.data().abbreviation }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setLigen(docs);
     });
     return () => unsub();
   }, [user]);
@@ -47,7 +68,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Challenge notifications are global (shown on all pages)
 
   const mainNav = [
-    { name: "Liga",               href: "/liga",        iconKey: "liga"        as const },
     { name: t("nav.tournaments"), href: "/tournaments", iconKey: "tournaments" as const },
     { name: t("nav.casual"),      href: "/casual",      iconKey: "casual"      as const },
     { name: t("nav.players"),     href: "/players",     iconKey: "players"     as const },
@@ -108,7 +128,104 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </Button>
 
           {/* Main nav */}
-          <nav className="flex-1 px-4 space-y-1 mt-4">
+          <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto">
+
+            {/* ── Liga section ── */}
+            {isCollapsed ? (
+              // Collapsed: just the liga icon linking to overview
+              <Link href="/liga" title="Ligen"
+                className={cn(
+                  "flex items-center justify-center rounded-md py-3 text-sm font-medium transition-colors",
+                  pathname.startsWith("/liga")
+                    ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
+                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-50",
+                )}
+              >
+                <Icon icon={getIcon("liga")} className={cn("shrink-0", iconSize)} style={pathname.startsWith("/liga") ? { color: primary } : undefined} />
+              </Link>
+            ) : (
+              // Expanded: Liga section header + sub-items
+              <div>
+                <button
+                  onClick={() => setLigaExpanded(!ligaExpanded)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    pathname.startsWith("/liga")
+                      ? "text-zinc-900 dark:text-zinc-50"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50",
+                  )}
+                >
+                  <Icon
+                    icon={getIcon("liga")}
+                    className={cn("shrink-0", iconSize)}
+                    style={pathname.startsWith("/liga") ? { color: primary } : undefined}
+                  />
+                  <span className="flex-1 text-left">Ligen</span>
+                  <ChevronDown
+                    className={cn("w-3.5 h-3.5 transition-transform text-zinc-400", ligaExpanded && "rotate-180")}
+                  />
+                </button>
+
+                {ligaExpanded && (
+                  <div className="ml-4 mt-0.5 space-y-0.5 border-l border-zinc-200 dark:border-zinc-700 pl-3">
+                    {ligen.length === 0 ? (
+                      <Link
+                        href="/liga"
+                        className="block text-xs text-zinc-400 dark:text-zinc-500 py-1.5 px-2 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                      >
+                        Keine Liga vorhanden
+                      </Link>
+                    ) : (
+                      ligen.map((liga) => {
+                        const ligaActive = pathname === `/liga/${liga.id}` || pathname.startsWith(`/liga/${liga.id}/`);
+                        return (
+                          <Link
+                            key={liga.id}
+                            href={`/liga/${liga.id}`}
+                            className={cn(
+                              "flex items-center gap-2 py-1.5 px-2 rounded-md text-sm transition-colors",
+                              ligaActive
+                                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 font-medium"
+                                : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-800 dark:hover:text-zinc-200",
+                            )}
+                          >
+                            {liga.abbreviation ? (
+                              <span
+                                className="text-[10px] font-black font-mono w-8 shrink-0 text-center leading-none px-1 py-0.5 rounded"
+                                style={ligaActive ? { color: primary, backgroundColor: primary + "18" } : { color: "rgb(107 114 128)" }}
+                              >
+                                {liga.abbreviation}
+                              </span>
+                            ) : (
+                              <Icon
+                                icon="mdi:shield-outline"
+                                className="w-3.5 h-3.5 shrink-0"
+                                style={ligaActive ? { color: primary } : undefined}
+                              />
+                            )}
+                            <span className="truncate text-xs">{liga.name}</span>
+                          </Link>
+                        );
+                      })
+                    )}
+                    <Link
+                      href="/liga"
+                      className={cn(
+                        "flex items-center gap-2 py-1.5 px-2 rounded-md text-xs transition-colors",
+                        pathname === "/liga"
+                          ? "text-zinc-700 dark:text-zinc-300 font-medium"
+                          : "text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300",
+                      )}
+                    >
+                      <Icon icon="mdi:view-list" className="w-3 h-3 shrink-0" />
+                      Alle Ligen
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Other nav items ── */}
             {mainNav.map((item) => {
               const active = isActive(item.href);
               return (
@@ -160,6 +277,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {!isMatchPage && (
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">
           <div className="flex items-stretch h-16">
+            {/* Liga always first in mobile nav */}
+            <MobileNavItem
+              href="/liga"
+              label="Liga"
+              iconKey="liga"
+              active={pathname.startsWith("/liga")}
+              getIcon={getIcon}
+              primaryColor={primary}
+            />
             {mainNav.map((item) => (
               <MobileNavItem
                 key={item.href}
