@@ -18,6 +18,7 @@ import { db } from "@/lib/firebase";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-errors";
 import { Medal, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
+import { grantSeasonAchievements } from "@/lib/achievementEngine";
 
 interface SeasonStandingEntry {
   playerId: string;
@@ -30,12 +31,13 @@ interface SeasonStandingEntry {
 }
 
 export default function StandingsPage() {
-  const { user, isAuthReady } = useFirebase();
+  const { user, isAuthReady, isAdmin } = useFirebase();
   const [seasons, setSeasons] = useState<any[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
   const [standings, setStandings] = useState<SeasonStandingEntry[]>([]);
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGranting, setIsGranting] = useState(false);
 
   // Seasons laden
   useEffect(() => {
@@ -291,9 +293,37 @@ export default function StandingsPage() {
             {/* Rangliste */}
             <Card>
               <CardHeader>
-                <CardTitle>
-                  Rangliste{selectedSeason ? ` – ${selectedSeason.name}` : ""}
-                </CardTitle>
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <CardTitle>
+                    Rangliste{selectedSeason ? ` – ${selectedSeason.name}` : ""}
+                  </CardTitle>
+                  {isAdmin && standings.length > 0 && (
+                    <button
+                      disabled={isGranting}
+                      onClick={async () => {
+                        if (!selectedSeasonId || standings.length === 0) return;
+                        if (!confirm('Saison-Achievements an alle Platzierten vergeben?\nDies sollte nur einmal am Saisonende gemacht werden.')) return;
+                        setIsGranting(true);
+                        try {
+                          const qualCount = finalTournament?.grandFinalConfig?.qualifierCount ?? 8;
+                          await grantSeasonAchievements(
+                            selectedSeasonId,
+                            selectedSeason?.name ?? '',
+                            standings.map((s) => ({ playerId: s.playerId, totalPoints: s.totalPoints })),
+                            qualCount,
+                          );
+                        } catch (err) {
+                          console.error('Season achievements error:', err);
+                        } finally {
+                          setIsGranting(false);
+                        }
+                      }}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 transition-colors disabled:opacity-50"
+                    >
+                      {isGranting ? 'Vergebe…' : '🏆 Saison-Achievements vergeben'}
+                    </button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoading ? (

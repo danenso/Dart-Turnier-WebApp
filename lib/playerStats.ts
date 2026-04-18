@@ -95,6 +95,10 @@ export interface Achievement {
   tier?: 'bronze' | 'silver' | 'gold' | 'diamond';
 }
 
+// Re-export so components can use a single import
+export type { EarnedAchievement } from './achievementEngine';
+export { LEAGUE_ACHIEVEMENTS } from './achievementEngine';
+
 function getStartScore(format: string): number {
   return format.startsWith('301') ? 301 : 501;
 }

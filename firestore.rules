@@ -54,7 +54,8 @@ service cloud.firestore {
              (!('email' in data) || data.email is string) &&
              (!('authUid' in data) || data.authUid is string) &&
              (!('avatar' in data) || data.avatar is string) &&
-             (!('nickname' in data) || data.nickname is string);
+             (!('nickname' in data) || data.nickname is string) &&
+             (!('earnedAchievements' in data) || data.earnedAchievements is list);
     }
 
     function isValidTournament(data) {

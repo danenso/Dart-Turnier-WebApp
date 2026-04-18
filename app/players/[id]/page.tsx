@@ -4,7 +4,7 @@ import { useFirebase } from '@/components/FirebaseProvider';
 import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
 import { slugify } from '@/lib/slugify';
-import { fetchPlayerMatches, calculateStats, getAchievements, MatchStats, PlayerStats, GameType } from '@/lib/playerStats';
+import { fetchPlayerMatches, calculateStats, getAchievements, MatchStats, PlayerStats, GameType, EarnedAchievement } from '@/lib/playerStats';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Icon } from '@iconify/react';
 import Link from 'next/link';
@@ -84,6 +84,7 @@ export default function PlayerStatsPage() {
   const filteredMatches = filter === 'all' ? matches : matches.filter(m => m.gameType === filter);
   const stats: PlayerStats = calculateStats(filteredMatches);
   const achievements = getAchievements(calculateStats(matches), matches);
+  const leagueAchievements: EarnedAchievement[] = playerProfile?.earnedAchievements ?? [];
 
   return (
     <div className="page-pad">
@@ -143,7 +144,7 @@ export default function PlayerStatsPage() {
         {!statsLoading && matches.length > 0 && (
           <div className="grid md:grid-cols-2 gap-4">
             <RecentGames matches={matches} />
-            <PlayerAchievements achievements={achievements} />
+            <PlayerAchievements achievements={achievements} leagueAchievements={leagueAchievements} />
           </div>
         )}
 

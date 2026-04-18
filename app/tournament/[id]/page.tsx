@@ -25,6 +25,7 @@ import { CheckoutBuilder } from "@/components/CheckoutBuilder";
 import { CheckoutConfig, DEFAULT_CHECKOUT_CONFIG, fromLegacyBooleans } from "@/lib/checkout-rules";
 import { MatchStartSelector } from "@/components/MatchStartSelector";
 import { DrawRule, MatchStartConfig, DEFAULT_DRAW_RULE, DEFAULT_MATCH_START } from "@/lib/match-rules";
+import { grantTournamentAchievements, grantGrandFinalAchievements } from "@/lib/achievementEngine";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { TiebreakManager } from "@/components/TiebreakManager";
@@ -687,6 +688,18 @@ export default function TournamentPage() {
         ...(tournament.isFinalTournament ? { isFinalTournament: true } : {}),
         isRetroactive: true,
       });
+
+      // Achievements nach dem Status-Update vergeben
+      try {
+        await grantTournamentAchievements(
+          id,
+          { ...tournament, seasonId: tournament.seasonId },
+          players,
+          [],  // Retroaktive Turniere haben keine Match-Dokumente für perfect-group
+        );
+      } catch (_) {
+        // Achievement errors don't block completion
+      }
 
       setIsRetroMatchDialogOpen(false);
     } catch (error) {
@@ -1392,6 +1405,15 @@ export default function TournamentPage() {
                       <Button
                         size="sm"
                         onClick={async () => {
+                          try {
+                            if (tournament.isFinalTournament) {
+                              await grantGrandFinalAchievements(id, tournament, matches);
+                            } else {
+                              await grantTournamentAchievements(id, tournament, players, matches);
+                            }
+                          } catch (_) {
+                            // Achievement errors don't block tournament completion
+                          }
                           await updateDoc(doc(db, "tournaments", id), {
                             status: "completed",
                           });
