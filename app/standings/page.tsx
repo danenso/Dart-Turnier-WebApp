@@ -91,8 +91,10 @@ export default function StandingsPage() {
         });
         setTournaments(allTourns);
 
-        // Nur abgeschlossene Turniere für die Rangliste
-        const completed = allTourns.filter((t) => t.status === "completed");
+        // Nur abgeschlossene reguläre Turniere für die Rangliste (Final-Turnier ausgeschlossen)
+        const completed = allTourns.filter(
+          (t) => t.status === "completed" && !t.isFinalTournament,
+        );
 
         const playerMap = new Map<string, SeasonStandingEntry>();
 
@@ -319,44 +321,69 @@ export default function StandingsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {standings.map((entry, i) => (
-                          <tr
-                            key={entry.playerId}
-                            className={`border-b dark:border-zinc-800 ${i === 0 ? "bg-yellow-50 dark:bg-yellow-950/20" : i === 1 ? "bg-zinc-50 dark:bg-zinc-800/30" : i === 2 ? "bg-orange-50 dark:bg-orange-950/20" : ""}`}
-                          >
-                            <td className="px-4 py-3 font-bold text-zinc-400">
-                              {i === 0 ? (
-                                <Medal className="w-5 h-5 text-yellow-500" />
-                              ) : i === 1 ? (
-                                <Medal className="w-5 h-5 text-zinc-400" />
-                              ) : i === 2 ? (
-                                <Medal className="w-5 h-5 text-orange-500" />
-                              ) : (
-                                <span className="text-zinc-400">{i + 1}</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 font-semibold">
-                              {entry.name}
-                            </td>
-                            <td className="px-4 py-3 text-center text-zinc-500">
-                              {entry.tournamentsPlayed}
-                            </td>
-                            <td className="px-4 py-3 text-center text-green-600 font-medium">
-                              {entry.wins}
-                            </td>
-                            <td className="px-4 py-3 text-center text-orange-500 font-medium">
-                              {entry.draws}
-                            </td>
-                            <td className="px-4 py-3 text-center text-red-500 font-medium">
-                              {entry.losses}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="text-lg font-bold">
-                                {entry.totalPoints}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {(() => {
+                          const qualCount = finalTournament?.grandFinalConfig?.qualifierCount ?? (finalTournament ? 8 : 0);
+                          const rows: React.ReactNode[] = [];
+                          standings.forEach((entry, i) => {
+                            // Trennzeile nach letztem Qualifier (nur wenn Final-Turnier nicht abgeschlossen)
+                            if (qualCount > 0 && i === qualCount && finalTournament?.status !== "completed") {
+                              rows.push(
+                                <tr key="nachrücker-divider">
+                                  <td colSpan={7} className="px-4 py-1.5 text-center text-xs text-zinc-400 italic bg-zinc-50 dark:bg-zinc-800/50">
+                                    — Nachrücker-Zone —
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            const isQualified = qualCount > 0 && i < qualCount;
+                            rows.push(
+                              <tr
+                                key={entry.playerId}
+                                className={`border-b dark:border-zinc-800 ${i === 0 ? "bg-yellow-50 dark:bg-yellow-950/20" : i === 1 ? "bg-zinc-50 dark:bg-zinc-800/30" : i === 2 ? "bg-orange-50 dark:bg-orange-950/20" : ""}`}
+                              >
+                                <td className="px-4 py-3 font-bold text-zinc-400">
+                                  {i === 0 ? (
+                                    <Medal className="w-5 h-5 text-yellow-500" />
+                                  ) : i === 1 ? (
+                                    <Medal className="w-5 h-5 text-zinc-400" />
+                                  ) : i === 2 ? (
+                                    <Medal className="w-5 h-5 text-orange-500" />
+                                  ) : (
+                                    <span className="text-zinc-400">{i + 1}</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 font-semibold">
+                                  <div className="flex items-center gap-2">
+                                    {entry.name}
+                                    {isQualified && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                                        Qualifiziert ✓
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-center text-zinc-500">
+                                  {entry.tournamentsPlayed}
+                                </td>
+                                <td className="px-4 py-3 text-center text-green-600 font-medium">
+                                  {entry.wins}
+                                </td>
+                                <td className="px-4 py-3 text-center text-orange-500 font-medium">
+                                  {entry.draws}
+                                </td>
+                                <td className="px-4 py-3 text-center text-red-500 font-medium">
+                                  {entry.losses}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className="text-lg font-bold">
+                                    {entry.totalPoints}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          });
+                          return rows;
+                        })()}
                       </tbody>
                     </table>
                   </div>

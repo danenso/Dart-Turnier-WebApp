@@ -37,6 +37,10 @@ import {
 import { db } from "@/lib/firebase";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-errors";
 import { BOT_PLAYER_ID, type AIDifficulty, getBotName, AI_DIFFICULTY_LABELS } from "@/lib/ai-player";
+import { CheckoutBuilder } from "@/components/CheckoutBuilder";
+import { CheckoutConfig, DEFAULT_CHECKOUT_CONFIG } from "@/lib/checkout-rules";
+import { MatchStartSelector } from "@/components/MatchStartSelector";
+import { DrawRule, MatchStartConfig, DEFAULT_DRAW_RULE, DEFAULT_MATCH_START } from "@/lib/match-rules";
 
 export default function CasualGamesPage() {
   const { user, isAuthReady, isAdmin } = useFirebase();
@@ -59,10 +63,9 @@ export default function CasualGamesPage() {
   const [tiebreakPlayerIds, setTiebreakPlayerIds] = useState<string[]>([]);
   const [singleMatchFormat, setSingleMatchFormat] = useState("301");
   const [singleMatchBestOf, setSingleMatchBestOf] = useState("3");
-  const [singleAllowSingleOut, setSingleAllowSingleOut] = useState(false);
-  const [singleAllowDoubleOut, setSingleAllowDoubleOut] = useState(true);
-  const [singleAllowTripleOut, setSingleAllowTripleOut] = useState(false);
-  const [singleAllowDraw, setSingleAllowDraw] = useState(false);
+  const [singleCheckoutConfig, setSingleCheckoutConfig] = useState<CheckoutConfig>(DEFAULT_CHECKOUT_CONFIG);
+  const [singleDrawRule, setSingleDrawRule] = useState<DrawRule>(DEFAULT_DRAW_RULE);
+  const [singleMatchStartConfig, setSingleMatchStartConfig] = useState<MatchStartConfig>(DEFAULT_MATCH_START);
   const [isVsAI, setIsVsAI] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>("medium");
   const [formError, setFormError] = useState("");
@@ -184,10 +187,9 @@ export default function CasualGamesPage() {
           title: `Single Match: ${p1.name} vs ${p2Name}`,
           status: "single_match",
           type: "single_match",
-          allowSingleOut: singleAllowSingleOut,
-          allowDoubleOut: singleAllowDoubleOut,
-          allowTripleOut: singleAllowTripleOut,
-          allowDraw: singleAllowDraw,
+          checkoutRule: singleCheckoutConfig,
+          drawRule: singleDrawRule,
+          matchStartConfig: singleMatchStartConfig,
           createdAt: new Date().toISOString(),
           ownerId: user.uid,
           ...(isVsAI ? { aiDifficulty, isVsAI: true } : {}),
@@ -882,55 +884,41 @@ export default function CasualGamesPage() {
                     </div>
 
                     <div className="grid gap-2 mt-2">
-                      <Label>Out Rules</Label>
-                      {[
-                        {
-                          id: "singleSingleOut",
-                          label: "Single Out (inkl. Bull)",
-                          checked: singleAllowSingleOut,
-                          onChange: setSingleAllowSingleOut,
-                        },
-                        {
-                          id: "singleDoubleOut",
-                          label: "Double Out (inkl. Bull's Eye)",
-                          checked: singleAllowDoubleOut,
-                          onChange: setSingleAllowDoubleOut,
-                        },
-                        {
-                          id: "singleTripleOut",
-                          label: "Triple Out (inkl. Bull's Eye)",
-                          checked: singleAllowTripleOut,
-                          onChange: setSingleAllowTripleOut,
-                        },
-                      ].map((rule) => (
-                        <div key={rule.id} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id={rule.id}
-                            checked={rule.checked}
-                            onChange={(e) => rule.onChange(e.target.checked)}
-                          />
-                          <Label htmlFor={rule.id} className="font-normal">
-                            {rule.label}
-                          </Label>
-                        </div>
-                      ))}
+                      <Label>Checkout-Regel</Label>
+                      <CheckoutBuilder
+                        value={singleCheckoutConfig}
+                        onChange={setSingleCheckoutConfig}
+                      />
                     </div>
 
-                    <div className="grid gap-2">
-                      <Label>Match Rules</Label>
-                      <div className="flex items-center gap-2">
+                    <div className="grid gap-2 pt-2 border-t">
+                      <Label>Draw-Regel</Label>
+                      <div className="flex items-start gap-2">
                         <input
                           type="checkbox"
-                          id="singleAllowDraw"
-                          checked={singleAllowDraw}
-                          onChange={(e) => setSingleAllowDraw(e.target.checked)}
+                          id="singleDrawEnabled"
+                          checked={singleDrawRule.enabled}
+                          onChange={(e) => setSingleDrawRule({ enabled: e.target.checked })}
                           disabled={singleMatchBestOf !== "1"}
+                          className="mt-0.5"
                         />
-                        <Label htmlFor="singleAllowDraw" className="font-normal">
-                          Unentschieden erlaubt (nur Best of 1)
-                        </Label>
+                        <div>
+                          <Label htmlFor="singleDrawEnabled" className={`font-normal ${singleMatchBestOf !== "1" ? "text-zinc-400" : ""}`}>
+                            Unentschieden erlaubt (Best of 1)
+                          </Label>
+                          <p className="text-xs text-zinc-400 mt-0.5">
+                            Spieler 2 darf nach dem Checkout von Spieler 1 noch seinen Wurf vollenden.
+                          </p>
+                        </div>
                       </div>
+                    </div>
+
+                    <div className="grid gap-2 pt-2 border-t">
+                      <Label>Anwurf-Konfiguration</Label>
+                      <MatchStartSelector
+                        value={singleMatchStartConfig}
+                        onChange={setSingleMatchStartConfig}
+                      />
                     </div>
                   </>
                 ) : (

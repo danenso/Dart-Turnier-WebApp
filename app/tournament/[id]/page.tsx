@@ -19,7 +19,12 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import { ArrowLeft, Trash2, Users, ClipboardList } from "lucide-react";
+import { ArrowLeft, Trash2, Users, ClipboardList, Settings2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { CheckoutBuilder } from "@/components/CheckoutBuilder";
+import { CheckoutConfig, DEFAULT_CHECKOUT_CONFIG, fromLegacyBooleans } from "@/lib/checkout-rules";
+import { MatchStartSelector } from "@/components/MatchStartSelector";
+import { DrawRule, MatchStartConfig, DEFAULT_DRAW_RULE, DEFAULT_MATCH_START } from "@/lib/match-rules";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { TiebreakManager } from "@/components/TiebreakManager";
@@ -35,7 +40,7 @@ import {
 
 export default function TournamentPage() {
   const { id } = useParams() as { id: string };
-  const { user, isAuthReady, isAdmin } = useFirebase();
+  const { user, isAuthReady, isAdmin, isSuperAdmin } = useFirebase();
   const router = useRouter();
 
   const [tournament, setTournament] = useState<any>(null);
@@ -45,13 +50,22 @@ export default function TournamentPage() {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [globalPlayers, setGlobalPlayers] = useState<any[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  // Retroaktive Ergebniseingabe
-  const [isRetroDialogOpen, setIsRetroDialogOpen] = useState(false);
-  const [retroPoints, setRetroPoints] = useState<Record<string, string>>({});
-  const [retroWins, setRetroWins] = useState<Record<string, string>>({});
-  const [retroLosses, setRetroLosses] = useState<Record<string, string>>({});
-  const [retroDraws, setRetroDraws] = useState<Record<string, string>>({});
-  const [isSavingRetro, setIsSavingRetro] = useState(false);
+  // Retroaktive Match-Eingabe
+  const [isRetroMatchDialogOpen, setIsRetroMatchDialogOpen] = useState(false);
+  const [retroFormat, setRetroFormat] = useState<'501_bo1' | '501_bo3' | '301_bo1' | '301_bo3'>('501_bo3');
+  type RetroPair = { aId: string; aName: string; bId: string; bName: string; key: string };
+  const [retroPairs, setRetroPairs] = useState<RetroPair[]>([]);
+  const [retroScores, setRetroScores] = useState<Record<string, { legsA: number; legsB: number }>>({});
+  const [isSavingRetroMatches, setIsSavingRetroMatches] = useState(false);
+
+  // Settings-Edit-Dialog
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editCheckout, setEditCheckout] = useState<CheckoutConfig>(DEFAULT_CHECKOUT_CONFIG);
+  const [editDrawRule, setEditDrawRule] = useState<DrawRule>(DEFAULT_DRAW_RULE);
+  const [editMatchStart, setEditMatchStart] = useState<MatchStartConfig>(DEFAULT_MATCH_START);
+  const [editBoards, setEditBoards] = useState(1);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -354,6 +368,12 @@ export default function TournamentPage() {
 
         const phase = isTop4 ? "semi" : "quarter";
 
+        const gfc = tournament?.grandFinalConfig;
+        const startScore = (fmt: string) => fmt.startsWith("301") ? 301 : 501;
+        const phaseFormat = isTop4
+          ? (gfc?.semiFormat ?? tournament?.format ?? "501_bo3")
+          : (gfc?.quarterFormat ?? tournament?.format ?? "501_bo3");
+
         for (const [pA, pB] of matchups) {
           await addDoc(collection(db, "tournaments", id, "matches"), {
             phase: phase,
@@ -366,11 +386,11 @@ export default function TournamentPage() {
             currentLeg: 1,
             playerAStartsLeg: true,
             currentTurnId: "",
-            playerARest: 301,
-            playerBRest: 301,
+            playerARest: startScore(phaseFormat),
+            playerBRest: startScore(phaseFormat),
             answerThrowActive: false,
             status: "pending",
-            format: "301_bo3",
+            format: phaseFormat,
           });
         }
 
@@ -419,6 +439,10 @@ export default function TournamentPage() {
           ],
         ];
 
+        const sfGfc = tournament?.grandFinalConfig;
+        const sfFmt = sfGfc?.semiFormat ?? tournament?.format ?? "501_bo3";
+        const sfStart = sfFmt.startsWith("301") ? 301 : 501;
+
         for (const [pA, pB] of sfMatchups) {
           await addDoc(collection(db, "tournaments", id, "matches"), {
             phase: "semi",
@@ -431,11 +455,11 @@ export default function TournamentPage() {
             currentLeg: 1,
             playerAStartsLeg: true,
             currentTurnId: "",
-            playerARest: 301,
-            playerBRest: 301,
+            playerARest: sfStart,
+            playerBRest: sfStart,
             answerThrowActive: false,
             status: "pending",
-            format: "301_bo3",
+            format: sfFmt,
           });
         }
       } else if (currentPhase === "semi") {
@@ -452,6 +476,10 @@ export default function TournamentPage() {
             ? { id: m2.playerAId, name: m2.playerAName }
             : { id: m2.playerBId, name: m2.playerBName };
 
+        const finGfc = tournament?.grandFinalConfig;
+        const finFmt = finGfc?.finalFormat ?? tournament?.format ?? "501_bo5";
+        const finStart = finFmt.startsWith("301") ? 301 : 501;
+
         await addDoc(collection(db, "tournaments", id, "matches"), {
           phase: "final",
           playerAId: pA.id,
@@ -463,11 +491,11 @@ export default function TournamentPage() {
           currentLeg: 1,
           playerAStartsLeg: true,
           currentTurnId: "",
-          playerARest: 501,
-          playerBRest: 501,
+          playerARest: finStart,
+          playerBRest: finStart,
           answerThrowActive: false,
           status: "pending",
-          format: "501_bo3",
+          format: finFmt,
         });
       }
     } catch (error) {
@@ -537,62 +565,170 @@ export default function TournamentPage() {
     }
   };
 
-  const openRetroDialog = () => {
-    // Vorbelegen mit 0
-    const pts: Record<string, string> = {};
-    const w: Record<string, string> = {};
-    const l: Record<string, string> = {};
-    const d: Record<string, string> = {};
-    players.forEach((p) => {
-      pts[p.id] = String(p.points ?? 0);
-      w[p.id] = String(p.wins ?? 0);
-      l[p.id] = String(p.losses ?? 0);
-      d[p.id] = String(p.draws ?? 0);
-    });
-    setRetroPoints(pts);
-    setRetroWins(w);
-    setRetroLosses(l);
-    setRetroDraws(d);
-    setIsRetroDialogOpen(true);
-  };
-
-  const saveRetroResults = async () => {
-    if (!user) return;
-    setIsSavingRetro(true);
-    try {
-      for (const p of players) {
-        const pts = Math.max(0, parseInt(retroPoints[p.id] ?? "0", 10) || 0);
-        const w = Math.max(0, parseInt(retroWins[p.id] ?? "0", 10) || 0);
-        const l = Math.max(0, parseInt(retroLosses[p.id] ?? "0", 10) || 0);
-        const dr = Math.max(0, parseInt(retroDraws[p.id] ?? "0", 10) || 0);
-        await setDoc(doc(db, "tournaments", id, "players", p.id), {
-          name: p.name,
-          points: pts,
-          matchesPlayed: w + l + dr,
-          wins: w,
-          draws: dr,
-          losses: l,
+  const openRetroMatchDialog = () => {
+    // Alle Round-Robin-Paare erzeugen
+    const sorted = [...players].sort((a, b) => a.name.localeCompare(b.name));
+    const pairs: { aId: string; aName: string; bId: string; bName: string; key: string }[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        pairs.push({
+          aId: sorted[i].id,
+          aName: sorted[i].name,
+          bId: sorted[j].id,
+          bName: sorted[j].name,
+          key: `${sorted[i].id}-${sorted[j].id}`,
         });
       }
+    }
+    setRetroPairs(pairs);
+
+    // Vorbelegen aus bereits gespeicherten Matches
+    const preScores: Record<string, { legsA: number; legsB: number }> = {};
+    matches.filter((m) => m.status === "completed").forEach((m) => {
+      const key = `${m.playerAId}-${m.playerBId}`;
+      const reverseKey = `${m.playerBId}-${m.playerAId}`;
+      const pair = pairs.find((p) => p.key === key || p.key === reverseKey);
+      if (pair) {
+        const isReverse = pair.key === reverseKey;
+        preScores[pair.key] = isReverse
+          ? { legsA: m.playerBLegs ?? 0, legsB: m.playerALegs ?? 0 }
+          : { legsA: m.playerALegs ?? 0, legsB: m.playerBLegs ?? 0 };
+      }
+    });
+    setRetroScores(preScores);
+
+    // Format aus Turnier übernehmen oder Standard
+    const fmt = tournament?.format;
+    if (fmt === '501_bo1' || fmt === '501_bo3' || fmt === '301_bo1' || fmt === '301_bo3') {
+      setRetroFormat(fmt);
+    } else {
+      setRetroFormat('501_bo3');
+    }
+
+    setIsRetroMatchDialogOpen(true);
+  };
+
+  const saveRetroMatches = async () => {
+    if (!user) return;
+    setIsSavingRetroMatches(true);
+    try {
+      // Bestehende group-Matches löschen (re-entry)
+      const existingGroupMatches = matches.filter((m) => m.phase === 'group');
+      for (const m of existingGroupMatches) {
+        await deleteDoc(doc(db, "tournaments", id, "matches", m.id));
+      }
+
+      const bestOfMatch = retroFormat.match(/bo(\d+)/);
+      const bestOf = bestOfMatch ? parseInt(bestOfMatch[1]) : 3;
+      const drawAllowed = tournament?.drawRule?.enabled || tournament?.allowDraw;
+
+      // Player-Stats aggregieren
+      const stats: Record<string, { wins: number; draws: number; losses: number; points: number; matchesPlayed: number }> = {};
+      players.forEach((p) => {
+        stats[p.id] = { wins: 0, draws: 0, losses: 0, points: 0, matchesPlayed: 0 };
+      });
+
+      // Neue Match-Dokumente anlegen
+      for (const pair of retroPairs) {
+        const score = retroScores[pair.key];
+        if (!score) continue; // nicht eingetragen → überspringen
+
+        const { legsA, legsB } = score;
+        const isDraw = drawAllowed && bestOf === 1 && legsA === 0 && legsB === 0;
+        const winnerId = isDraw ? null : legsA > legsB ? pair.aId : pair.bId;
+
+        await addDoc(collection(db, "tournaments", id, "matches"), {
+          phase: 'group',
+          playerAId: pair.aId,
+          playerBId: pair.bId,
+          playerAName: pair.aName,
+          playerBName: pair.bName,
+          playerALegs: legsA,
+          playerBLegs: legsB,
+          status: 'completed',
+          format: retroFormat,
+          winnerId: winnerId ?? '',
+          isDraw: isDraw || false,
+        });
+
+        // Stats berechnen
+        if (isDraw) {
+          if (stats[pair.aId]) { stats[pair.aId].draws++; stats[pair.aId].points++; stats[pair.aId].matchesPlayed++; }
+          if (stats[pair.bId]) { stats[pair.bId].draws++; stats[pair.bId].points++; stats[pair.bId].matchesPlayed++; }
+        } else if (winnerId === pair.aId) {
+          if (stats[pair.aId]) { stats[pair.aId].wins++; stats[pair.aId].points += 2; stats[pair.aId].matchesPlayed++; }
+          if (stats[pair.bId]) { stats[pair.bId].losses++; stats[pair.bId].matchesPlayed++; }
+        } else if (winnerId === pair.bId) {
+          if (stats[pair.bId]) { stats[pair.bId].wins++; stats[pair.bId].points += 2; stats[pair.bId].matchesPlayed++; }
+          if (stats[pair.aId]) { stats[pair.aId].losses++; stats[pair.aId].matchesPlayed++; }
+        }
+      }
+
+      // Player-Dokumente updaten
+      for (const p of players) {
+        const s = stats[p.id];
+        if (!s) continue;
+        await setDoc(doc(db, "tournaments", id, "players", p.id), {
+          name: p.name,
+          points: s.points,
+          matchesPlayed: s.matchesPlayed,
+          wins: s.wins,
+          draws: s.draws,
+          losses: s.losses,
+        });
+      }
+
+      // Turnier abschließen
       await updateDoc(doc(db, "tournaments", id), {
-        title: tournament.title,
         status: "completed",
-        allowSingleOut: tournament.allowSingleOut ?? false,
-        allowDoubleOut: tournament.allowDoubleOut ?? true,
-        allowTripleOut: tournament.allowTripleOut ?? false,
-        allowDraw: tournament.allowDraw ?? false,
-        createdAt: tournament.createdAt,
-        ownerId: tournament.ownerId,
+        format: retroFormat,
         ...(tournament.seasonId ? { seasonId: tournament.seasonId } : {}),
         ...(tournament.tournamentNumber !== undefined ? { tournamentNumber: tournament.tournamentNumber } : {}),
         ...(tournament.isFinalTournament ? { isFinalTournament: true } : {}),
-        ...(tournament.isRetroactive ? { isRetroactive: true } : {}),
+        isRetroactive: true,
       });
-      setIsRetroDialogOpen(false);
+
+      setIsRetroMatchDialogOpen(false);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `tournaments/${id}`);
     } finally {
-      setIsSavingRetro(false);
+      setIsSavingRetroMatches(false);
+    }
+  };
+
+  const openEditDialog = () => {
+    if (!tournament) return;
+    setEditTitle(tournament.title ?? "");
+    setEditCheckout(
+      tournament.checkoutRule ??
+      fromLegacyBooleans(
+        tournament.allowSingleOut ?? false,
+        tournament.allowDoubleOut !== false,
+        tournament.allowTripleOut ?? false,
+      ),
+    );
+    setEditDrawRule(tournament.drawRule ?? DEFAULT_DRAW_RULE);
+    setEditMatchStart(tournament.matchStartConfig ?? DEFAULT_MATCH_START);
+    setEditBoards(tournament.numberOfBoards ?? 1);
+    setIsEditOpen(true);
+  };
+
+  const saveSettings = async () => {
+    if (!editTitle.trim()) return;
+    setIsSavingEdit(true);
+    try {
+      const updates: any = { title: editTitle.trim(), numberOfBoards: editBoards };
+      if (tournament.status === "draft") {
+        updates.checkoutRule = editCheckout;
+        updates.drawRule = editDrawRule;
+        updates.matchStartConfig = editMatchStart;
+      }
+      await updateDoc(doc(db, "tournaments", id), updates);
+      setIsEditOpen(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `tournaments/${id}`);
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -720,16 +856,31 @@ export default function TournamentPage() {
               <span className="text-sm text-zinc-500 flex items-center gap-1">
                 <Users className="h-4 w-4" /> {players.length} Spieler
               </span>
+              {(tournament.numberOfBoards ?? 1) > 1 && (
+                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 text-zinc-600">
+                  🎯 {tournament.numberOfBoards} Scheiben
+                </span>
+              )}
             </div>
           </div>
           {isAdmin && (
-            <Button
-              variant="destructive"
-              onClick={() => setIsDeleteDialogOpen(true)}
-              className="w-full sm:w-auto"
-            >
-              <Trash2 className="w-4 h-4 mr-2" /> Delete Tournament
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={openEditDialog}
+                title="Einstellungen"
+              >
+                <Settings2 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="flex-1 sm:flex-none"
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> Delete Tournament
+              </Button>
+            </div>
           )}
         </div>
 
@@ -871,21 +1022,30 @@ export default function TournamentPage() {
               <Card className="md:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Spielerliste</CardTitle>
-                  {tournament.status === "draft" && (
-                    tournament.isRetroactive ? (
-                      <Button
-                        onClick={openRetroDialog}
-                        disabled={players.length === 0}
-                        className="bg-orange-600 hover:bg-orange-700"
-                      >
-                        <ClipboardList className="w-4 h-4 mr-2" />
-                        Ergebnisse eintragen
-                      </Button>
-                    ) : (
-                      <Button onClick={startDraw} disabled={players.length < 4}>
-                        Auslosung starten
-                      </Button>
-                    )
+                  {tournament.isRetroactive && tournament.status === "draft" && (
+                    <Button
+                      onClick={openRetroMatchDialog}
+                      disabled={players.length < 2}
+                      className="bg-orange-600 hover:bg-orange-700"
+                    >
+                      <ClipboardList className="w-4 h-4 mr-2" />
+                      Matches eintragen
+                    </Button>
+                  )}
+                  {tournament.isRetroactive && tournament.status === "completed" && isAdmin && (
+                    <Button
+                      onClick={openRetroMatchDialog}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <ClipboardList className="w-4 h-4 mr-2" />
+                      Matches bearbeiten
+                    </Button>
+                  )}
+                  {!tournament.isRetroactive && tournament.status === "draft" && (
+                    <Button onClick={startDraw} disabled={players.length < 4}>
+                      Auslosung starten
+                    </Button>
                   )}
                 </CardHeader>
                 <CardContent>
@@ -1384,114 +1544,114 @@ export default function TournamentPage() {
         </Tabs>
 
         {/* Retroaktive Ergebniseingabe Dialog */}
-        <Dialog open={isRetroDialogOpen} onOpenChange={setIsRetroDialogOpen}>
+        {/* Retroaktive Match-Eingabe */}
+        <Dialog open={isRetroMatchDialogOpen} onOpenChange={setIsRetroMatchDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Ergebnisse eintragen – {tournament.title}</DialogTitle>
+              <DialogTitle>Matches eintragen – {tournament.title}</DialogTitle>
               <DialogDescription>
-                Gib für jeden Spieler die Punkte aus der Gruppenphase ein.
-                Win = 2 Pkt, Unentschieden = 1 Pkt, Niederlage = 0 Pkt.
+                Trage für jedes Match die Leg-Ergebnisse ein. Nicht gespielte Matches einfach leer lassen.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-zinc-500 uppercase bg-zinc-50 dark:bg-zinc-800/50">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Spieler</th>
-                      <th className="px-3 py-2 text-center">S (Siege)</th>
-                      <th className="px-3 py-2 text-center">U (Unentsch.)</th>
-                      <th className="px-3 py-2 text-center">N (Niederl.)</th>
-                      <th className="px-3 py-2 text-center font-bold">Punkte</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...players]
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map((p) => (
-                        <tr key={p.id} className="border-b dark:border-zinc-800">
-                          <td className="px-3 py-2 font-medium">{p.name}</td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={0}
-                              value={retroWins[p.id] ?? "0"}
-                              onChange={(e) => {
-                                const w = e.target.value;
-                                setRetroWins((prev) => ({ ...prev, [p.id]: w }));
-                                const wn = parseInt(w, 10) || 0;
-                                const dr = parseInt(retroDraws[p.id] ?? "0", 10) || 0;
-                                setRetroPoints((prev) => ({ ...prev, [p.id]: String(wn * 2 + dr) }));
-                              }}
-                              className="w-16 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-center bg-white dark:bg-zinc-900"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={0}
-                              value={retroDraws[p.id] ?? "0"}
-                              onChange={(e) => {
-                                const dr = e.target.value;
-                                setRetroDraws((prev) => ({ ...prev, [p.id]: dr }));
-                                const drn = parseInt(dr, 10) || 0;
-                                const wn = parseInt(retroWins[p.id] ?? "0", 10) || 0;
-                                setRetroPoints((prev) => ({ ...prev, [p.id]: String(wn * 2 + drn) }));
-                              }}
-                              className="w-16 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-center bg-white dark:bg-zinc-900"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={0}
-                              value={retroLosses[p.id] ?? "0"}
-                              onChange={(e) =>
-                                setRetroLosses((prev) => ({
-                                  ...prev,
-                                  [p.id]: e.target.value,
-                                }))
-                              }
-                              className="w-16 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-center bg-white dark:bg-zinc-900"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <input
-                              type="number"
-                              min={0}
-                              value={retroPoints[p.id] ?? "0"}
-                              onChange={(e) =>
-                                setRetroPoints((prev) => ({
-                                  ...prev,
-                                  [p.id]: e.target.value,
-                                }))
-                              }
-                              className="w-16 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-center font-bold bg-white dark:bg-zinc-900"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+            <div className="py-4 space-y-4">
+              {/* Format-Auswahl */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap">Format:</span>
+                <select
+                  value={retroFormat}
+                  onChange={(e) => setRetroFormat(e.target.value as typeof retroFormat)}
+                  className="border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-zinc-900"
+                >
+                  <option value="501_bo1">501 · Best of 1</option>
+                  <option value="501_bo3">501 · Best of 3</option>
+                  <option value="301_bo1">301 · Best of 1</option>
+                  <option value="301_bo3">301 · Best of 3</option>
+                </select>
               </div>
-              <p className="text-xs text-zinc-400 mt-3">
-                Tipp: S und U füllen die Punkte automatisch aus (S×2 + U×1).
-                Du kannst Punkte auch direkt überschreiben.
+
+              {/* Match-Liste */}
+              <div className="space-y-2">
+                {retroPairs.map((pair) => {
+                  const score = retroScores[pair.key];
+                  const bestOf = retroFormat.includes('bo3') ? 3 : 1;
+                  const maxLegs = Math.ceil(bestOf / 2) + (bestOf > 1 ? 0 : 0); // bo1→1, bo3→2
+                  const legsToWin = Math.ceil(bestOf / 2);
+
+                  return (
+                    <div key={pair.key} className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg px-3 py-2">
+                      <span className="flex-1 text-sm font-medium text-right truncate">{pair.aName}</span>
+
+                      {/* Legs A */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => setRetroScores((prev) => ({
+                            ...prev,
+                            [pair.key]: { legsA: Math.max(0, (prev[pair.key]?.legsA ?? 0) - 1), legsB: prev[pair.key]?.legsB ?? 0 }
+                          }))}
+                          className="w-6 h-6 rounded bg-zinc-200 dark:bg-zinc-700 text-xs font-bold hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                        >−</button>
+                        <span className="w-5 text-center text-sm font-bold">{score?.legsA ?? '–'}</span>
+                        <button
+                          onClick={() => setRetroScores((prev) => ({
+                            ...prev,
+                            [pair.key]: { legsA: Math.min(legsToWin, (prev[pair.key]?.legsA ?? 0) + 1), legsB: prev[pair.key]?.legsB ?? 0 }
+                          }))}
+                          className="w-6 h-6 rounded bg-zinc-200 dark:bg-zinc-700 text-xs font-bold hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                        >+</button>
+                      </div>
+
+                      <span className="text-zinc-400 text-sm">:</span>
+
+                      {/* Legs B */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => setRetroScores((prev) => ({
+                            ...prev,
+                            [pair.key]: { legsA: prev[pair.key]?.legsA ?? 0, legsB: Math.max(0, (prev[pair.key]?.legsB ?? 0) - 1) }
+                          }))}
+                          className="w-6 h-6 rounded bg-zinc-200 dark:bg-zinc-700 text-xs font-bold hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                        >−</button>
+                        <span className="w-5 text-center text-sm font-bold">{score?.legsB ?? '–'}</span>
+                        <button
+                          onClick={() => setRetroScores((prev) => ({
+                            ...prev,
+                            [pair.key]: { legsA: prev[pair.key]?.legsA ?? 0, legsB: Math.min(legsToWin, (prev[pair.key]?.legsB ?? 0) + 1) }
+                          }))}
+                          className="w-6 h-6 rounded bg-zinc-200 dark:bg-zinc-700 text-xs font-bold hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                        >+</button>
+                      </div>
+
+                      <span className="flex-1 text-sm font-medium text-left truncate">{pair.bName}</span>
+
+                      {/* Löschen */}
+                      <button
+                        onClick={() => setRetroScores((prev) => {
+                          const next = { ...prev };
+                          delete next[pair.key];
+                          return next;
+                        })}
+                        className="text-zinc-300 dark:text-zinc-600 hover:text-red-400 transition-colors text-xs ml-1"
+                        title="Nicht gespielt"
+                      >✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-xs text-zinc-400">
+                {Object.keys(retroScores).length} von {retroPairs.length} Matches eingetragen · Standings werden automatisch kalkuliert
               </p>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsRetroDialogOpen(false)}
-              >
+              <Button variant="outline" onClick={() => setIsRetroMatchDialogOpen(false)}>
                 Abbrechen
               </Button>
               <Button
-                onClick={saveRetroResults}
-                disabled={isSavingRetro}
+                onClick={saveRetroMatches}
+                disabled={isSavingRetroMatches || Object.keys(retroScores).length === 0}
                 className="bg-orange-600 hover:bg-orange-700"
               >
-                {isSavingRetro ? "Speichern..." : "Turnier abschließen"}
+                {isSavingRetroMatches ? "Speichert..." : "Turnier abschließen"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1515,6 +1675,101 @@ export default function TournamentPage() {
               </Button>
               <Button variant="destructive" onClick={deleteTournament}>
                 Löschen
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Einstellungen bearbeiten */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Turnier-Einstellungen</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="editTitle">Turniername</Label>
+                <Input
+                  id="editTitle"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+
+              {tournament?.status !== "draft" && (
+                <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                  Spielregeln können nur im Draft-Status geändert werden. Nur der Turniername und die Anzahl der Dartscheiben sind editierbar.
+                </div>
+              )}
+
+              <div className="grid gap-2 pt-2 border-t">
+                <Label>Dartscheiben</Label>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setEditBoards(n)}
+                      className={`w-10 h-10 rounded-lg text-sm font-bold transition-colors ${
+                        editBoards === n
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <fieldset disabled={tournament?.status !== "draft"} className="contents">
+                <div className="grid gap-2 pt-2 border-t">
+                  <Label>Checkout-Regel</Label>
+                  <CheckoutBuilder
+                    value={editCheckout}
+                    onChange={setEditCheckout}
+                    showInRule={true}
+                  />
+                </div>
+
+                <div className="grid gap-2 pt-2 border-t">
+                  <Label>Draw-Regel</Label>
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="editDrawEnabled"
+                      checked={editDrawRule.enabled}
+                      onChange={(e) => setEditDrawRule({ enabled: e.target.checked })}
+                      className="mt-0.5"
+                      disabled={tournament?.status !== "draft"}
+                    />
+                    <div>
+                      <Label htmlFor="editDrawEnabled" className="font-normal">
+                        Unentschieden erlaubt (Best of 1)
+                      </Label>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Spieler 2 darf nach dem Checkout von Spieler 1 noch seinen Wurf vollenden.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-2 pt-2 border-t">
+                  <Label>Anwurf-Konfiguration</Label>
+                  <MatchStartSelector
+                    value={editMatchStart}
+                    onChange={setEditMatchStart}
+                  />
+                </div>
+              </fieldset>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button onClick={saveSettings} disabled={isSavingEdit || !editTitle.trim()}>
+                {isSavingEdit ? "Speichert..." : "Speichern"}
               </Button>
             </DialogFooter>
           </DialogContent>

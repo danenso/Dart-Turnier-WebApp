@@ -1,3 +1,5 @@
+import { isValidCheckout, canCheckout, type CheckoutConfig } from '@/lib/checkout-rules';
+
 export const BOT_PLAYER_ID = "ai-bot-player";
 export type AIDifficulty = "easy" | "medium" | "hard";
 
@@ -113,9 +115,7 @@ function throwDart(difficulty: AIDifficulty, rest: number): AIDart {
 export function generateAITurn(
   rest: number,
   difficulty: AIDifficulty,
-  allowSingleOut: boolean,
-  allowDoubleOut: boolean,
-  allowTripleOut: boolean,
+  checkoutConfig: CheckoutConfig,
 ): AITurnResult {
   const darts: AIDart[] = [];
   let remaining = rest;
@@ -125,30 +125,20 @@ export function generateAITurn(
     const newRemaining = remaining - dart.scoredPoints;
 
     if (newRemaining < 0) {
-      // Bust
       darts.push(dart);
       return { darts, isBust: true, isCheckout: false, newRest: rest };
     }
 
-    if (newRemaining === 1 && !allowSingleOut) {
-      // Kein Checkout möglich – Bust
+    if (newRemaining === 1 && !canCheckout(1, checkoutConfig)) {
       darts.push(dart);
       return { darts, isBust: true, isCheckout: false, newRest: rest };
     }
 
     if (newRemaining === 0) {
-      const isBull = dart.baseValue === 25 && dart.multiplier === "single";
-      const isBullseye = dart.baseValue === 25 && dart.multiplier === "double";
-      let validCheckout =
-        (allowSingleOut && (dart.multiplier === "single" || isBull || isBullseye)) ||
-        (allowDoubleOut && (dart.multiplier === "double" || isBull || isBullseye)) ||
-        (allowTripleOut && (dart.multiplier === "triple" || isBull || isBullseye));
-
-      if (validCheckout) {
+      if (isValidCheckout(dart.multiplier, dart.baseValue, 0, checkoutConfig)) {
         darts.push(dart);
         return { darts, isBust: false, isCheckout: true, newRest: 0 };
       } else {
-        // Falscher Checkout-Typ → Bust
         darts.push(dart);
         return { darts, isBust: true, isCheckout: false, newRest: rest };
       }

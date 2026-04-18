@@ -163,14 +163,36 @@ export const CHECKOUT_ROUTES: Record<number, string> = {
   2: 'D1',
 };
 
-export function getCheckoutSuggestion(rest: number, dartsInHand: number): string | null {
+import type { CheckoutConfig } from '@/lib/checkout-rules';
+
+export function getCheckoutSuggestion(
+  rest: number,
+  dartsInHand: number,
+  checkoutConfig?: CheckoutConfig,
+): string | null {
   if (rest > 170 || rest < 2) return null;
-  
+
   const route = CHECKOUT_ROUTES[rest];
   if (!route) return null;
 
+  // Wenn eine Config übergeben wird: prüfen ob die vorgeschlagene Route kompatibel ist.
+  // Double-Out-Routen enden immer auf D-Feldern – bei Single-Out-Config trotzdem anzeigen.
+  // Bei stricten Fällen (z.B. Triple Out) könnten Routen nicht passen – dann null.
+  if (checkoutConfig) {
+    const fields = checkoutConfig.allowedFields;
+    const steps = route.split(', ');
+    const lastStep = steps[steps.length - 1];
+    const isDouble = lastStep.startsWith('D') || lastStep === 'Bull' || lastStep === 'Bullseye';
+    const isSingle = !lastStep.startsWith('D') && !lastStep.startsWith('T');
+    const isTriple = lastStep.startsWith('T');
+
+    if (isDouble && !fields.includes('double') && !fields.includes('bullseye')) return null;
+    if (isSingle && !fields.includes('single') && !fields.includes('bull')) return null;
+    if (isTriple && !fields.includes('triple')) return null;
+  }
+
   const steps = route.split(', ');
-  
+
   if (dartsInHand === 3) return route;
   if (dartsInHand === 2 && steps.length <= 2) return steps.join(', ');
   if (dartsInHand === 1 && steps.length === 1) return steps[0];

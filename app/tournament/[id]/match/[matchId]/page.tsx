@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SongPlayer } from "@/components/SongPlayer";
 import { getCheckoutSuggestion } from "@/lib/checkout";
+import { isValidCheckout, canCheckout, fromLegacyBooleans, type CheckoutConfig } from "@/lib/checkout-rules";
+import { DEFAULT_MATCH_START, DEFAULT_DRAW_RULE, type MatchStartConfig } from "@/lib/match-rules";
 import { db } from "@/lib/firebase";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-errors";
 import {
@@ -49,6 +51,7 @@ export default function MatchPage() {
   const [aiThinking, setAiThinking] = useState(false);
   const [profilesLoaded, setProfilesLoaded] = useState(false);
   const [dartboardMode, setDartboardMode] = useState(false);
+  const [coinFlipResult, setCoinFlipResult] = useState<'A' | 'B' | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const submitTurnRef = useRef<typeof submitTurn | null>(null);
   const aiThinkingRef = useRef(false);
@@ -220,6 +223,15 @@ export default function MatchPage() {
     }
   };
 
+  const handleCoinFlip = () => {
+    const result: 'A' | 'B' = Math.random() < 0.5 ? 'A' : 'B';
+    setCoinFlipResult(result);
+    setTimeout(() => {
+      setStarter(result === 'A' ? match.playerAId : match.playerBId);
+      setCoinFlipResult(null);
+    }, 2000);
+  };
+
   const handleDartInput = async (baseValue: number) => {
     if (baseValue === 25 && multiplier === "triple") {
       setMultiplier("single");
@@ -254,28 +266,19 @@ export default function MatchPage() {
     let isBust = false;
     let isCheckout = false;
 
-    const allowSingleOut = tournament?.allowSingleOut || false;
-    const allowDoubleOut = tournament?.allowDoubleOut !== false; // default true
-    const allowTripleOut = tournament?.allowTripleOut || false;
+    const checkoutConfig: CheckoutConfig = tournament?.checkoutRule
+      ?? fromLegacyBooleans(
+          tournament?.allowSingleOut ?? false,
+          tournament?.allowDoubleOut !== false,
+          tournament?.allowTripleOut ?? false,
+        );
 
     if (newRest < 0) {
       isBust = true;
-    } else if (newRest === 1 && !allowSingleOut) {
+    } else if (newRest === 1 && !canCheckout(1, checkoutConfig)) {
       isBust = true;
     } else if (newRest === 0) {
-      const isBull = baseValue === 25 && mult === "single";
-      const isBullsEye = baseValue === 25 && mult === "double";
-
-      let validCheckout = false;
-
-      if (allowSingleOut && (mult === "single" || isBull || isBullsEye))
-        validCheckout = true;
-      if (allowDoubleOut && (mult === "double" || isBull || isBullsEye))
-        validCheckout = true;
-      if (allowTripleOut && (mult === "triple" || isBull || isBullsEye))
-        validCheckout = true;
-
-      if (validCheckout) {
+      if (isValidCheckout(mult, baseValue, 0, checkoutConfig)) {
         isCheckout = true;
       } else {
         isBust = true;
@@ -356,7 +359,8 @@ export default function MatchPage() {
 
     if (isCheckout) {
       const isBestOfOne = match.format?.includes("bo1");
-      const allowDraw = tournament?.allowDraw && isBestOfOne;
+      const drawRule = tournament?.drawRule ?? DEFAULT_DRAW_RULE;
+      const allowDraw = (drawRule.enabled || tournament?.allowDraw) && isBestOfOne;
 
       if (match.answerThrowActive) {
         legEnded = true;
@@ -532,8 +536,24 @@ export default function MatchPage() {
         updates.playerALegs = newPlayerALegs;
         updates.playerBLegs = newPlayerBLegs;
         updates.currentLeg = (match.currentLeg || 1) + 1;
-        updates.playerAStartsLeg = !match.playerAStartsLeg;
-        updates.currentTurnId = updates.playerAStartsLeg
+
+        // Determine who starts the next leg based on matchStartConfig
+        // If matchStartConfig is absent (legacy tournament), preserve alternating behavior
+        const subsequentLegsRule = tournament?.matchStartConfig?.subsequentLegs;
+        const didPlayerAWinLeg = winnerId === match.playerAId;
+        let nextStarterIsA: boolean;
+        if (!subsequentLegsRule) {
+          nextStarterIsA = !match.playerAStartsLeg; // legacy: alternating
+        } else {
+          switch (subsequentLegsRule) {
+            case 'winner-starts': nextStarterIsA = didPlayerAWinLeg; break;
+            case 'loser-starts':  nextStarterIsA = !didPlayerAWinLeg; break;
+            default:              nextStarterIsA = !match.playerAStartsLeg;
+          }
+        }
+
+        updates.playerAStartsLeg = nextStarterIsA;
+        updates.currentTurnId = nextStarterIsA
           ? match.playerAId
           : match.playerBId;
         const rest = match.format?.startsWith("501") ? 501 : 301;
@@ -584,13 +604,14 @@ export default function MatchPage() {
       const difficulty: AIDifficulty = tournament.aiDifficulty ?? "medium";
       const rest = match.playerBRest;
 
-      const result = generateAITurn(
-        rest,
-        difficulty,
-        tournament.allowSingleOut || false,
-        tournament.allowDoubleOut !== false,
-        tournament.allowTripleOut || false,
-      );
+      const aiCheckoutConfig: CheckoutConfig = tournament.checkoutRule
+        ?? fromLegacyBooleans(
+            tournament.allowSingleOut ?? false,
+            tournament.allowDoubleOut !== false,
+            tournament.allowTripleOut ?? false,
+          );
+
+      const result = generateAITurn(rest, difficulty, aiCheckoutConfig);
 
       if (submitTurnRef.current) {
         await submitTurnRef.current(result.darts, result.isBust, result.isCheckout, result.newRest);
@@ -645,6 +666,9 @@ export default function MatchPage() {
       ? "Freispiel"
       : tournament?.name ?? "Turnier";
     const isVsAI = tournament?.isVsAI === true;
+    const matchStartConfig: MatchStartConfig = tournament?.matchStartConfig ?? DEFAULT_MATCH_START;
+    const isCoinFlipMode = matchStartConfig.firstLeg === 'coin-flip' && !isVsAI;
+    const isBullThrowMode = matchStartConfig.firstLeg === 'bull-throw' && !isVsAI;
 
     const renderPlayerCard = (isA: boolean) => {
       const profile = isA ? playerAProfile : playerBProfile;
@@ -688,10 +712,10 @@ export default function MatchPage() {
             </p>
           )}
 
-          {/* Name als Button — Bot-Karte startet immer mit Mensch */}
+          {/* Name als Button — in Münzwurf- oder Bull-Throw-Modus deaktiviert */}
           <button
-            onClick={() => canInput ? (isBot ? setStarter(match.playerAId) : setStarter(playerId)) : undefined}
-            disabled={!canInput}
+            onClick={() => (canInput && !isCoinFlipMode && !isBullThrowMode) ? (isBot ? setStarter(match.playerAId) : setStarter(playerId)) : undefined}
+            disabled={!canInput || isCoinFlipMode || isBullThrowMode}
             className={`group relative w-full px-6 py-3 md:px-8 md:py-4 rounded-xl font-bold text-base md:text-lg
               transition-all duration-200 shadow-lg focus:outline-none
               ${!canInput ? "opacity-40 cursor-not-allowed" : "active:scale-95"}
@@ -759,7 +783,7 @@ export default function MatchPage() {
 
           {/* Question */}
           <p className="text-center text-zinc-500 dark:text-zinc-400 text-sm md:text-base mt-1 match-fade-down" style={{ animationDelay: "0.05s" }}>
-            Wer beginnt das Spiel?
+            {isCoinFlipMode ? "Münzwurf entscheidet wer beginnt" : isBullThrowMode ? "Bull-Wurf entscheidet wer beginnt" : "Wer beginnt das Spiel?"}
           </p>
 
           {/* Main area: Players + VS */}
@@ -784,12 +808,38 @@ export default function MatchPage() {
             </div>
           </div>
 
-          {/* Bottom: Venue / Dartboard toggle */}
+          {/* Bottom: Venue / Dartboard toggle / Coin-flip */}
           <div className="flex flex-col items-center gap-3 pb-6 pt-2 match-fade-up">
             <div className="px-5 py-1.5 rounded-full bg-zinc-900/5 border border-zinc-900/8 dark:bg-white/5 dark:border-white/10 text-zinc-500 dark:text-zinc-500 text-xs font-medium tracking-widest uppercase">
               {venueLabel}
             </div>
-            {canInput && !isVsAI && (
+            {isCoinFlipMode && canInput && (
+              coinFlipResult ? (
+                <div className="flex flex-col items-center gap-1">
+                  <div className="text-4xl animate-bounce">🪙</div>
+                  <p className="text-base font-bold text-zinc-800 dark:text-white">
+                    {coinFlipResult === 'A' ? match.playerAName : match.playerBName} beginnt!
+                  </p>
+                </div>
+              ) : (
+                <button
+                  onClick={handleCoinFlip}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-amber-500/10 border border-amber-400/40 text-amber-700 dark:text-amber-300 text-sm font-medium hover:bg-amber-500/20 transition-colors"
+                >
+                  🪙 Münzwurf starten
+                </button>
+              )
+            )}
+            {isBullThrowMode && canInput && (
+              <button
+                onClick={() => setDartboardMode(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-zinc-900/8 border border-zinc-900/15 dark:bg-white/10 dark:border-white/20 text-zinc-700 dark:text-zinc-300 text-sm font-medium hover:bg-zinc-900/15 transition-colors"
+              >
+                <Target className="w-4 h-4" />
+                Dartscheibe öffnen
+              </button>
+            )}
+            {!isCoinFlipMode && !isBullThrowMode && canInput && !isVsAI && (
               <button
                 onClick={() => setDartboardMode(!dartboardMode)}
                 className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
@@ -1243,6 +1293,11 @@ export default function MatchPage() {
                   : match.playerBRest) -
                   currentDarts.reduce((sum, d) => sum + d.scoredPoints, 0),
                 3 - currentDarts.length,
+                tournament?.checkoutRule ?? fromLegacyBooleans(
+                  tournament?.allowSingleOut ?? false,
+                  tournament?.allowDoubleOut !== false,
+                  tournament?.allowTripleOut ?? false,
+                ),
               ) && (
                 <span className="text-green-400 font-semibold text-xs">
                   🎯{" "}
@@ -1255,6 +1310,11 @@ export default function MatchPage() {
                         0,
                       ),
                     3 - currentDarts.length,
+                    tournament?.checkoutRule ?? fromLegacyBooleans(
+                      tournament?.allowSingleOut ?? false,
+                      tournament?.allowDoubleOut !== false,
+                      tournament?.allowTripleOut ?? false,
+                    ),
                   )}
                 </span>
               )}

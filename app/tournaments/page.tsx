@@ -26,28 +26,61 @@ import {
   where,
   onSnapshot,
   addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-errors";
+import { CheckoutBuilder } from "@/components/CheckoutBuilder";
+import { CheckoutConfig, DEFAULT_CHECKOUT_CONFIG } from "@/lib/checkout-rules";
+import { MatchStartSelector } from "@/components/MatchStartSelector";
+import { DrawRule, MatchStartConfig, DEFAULT_DRAW_RULE, DEFAULT_MATCH_START } from "@/lib/match-rules";
+import { Trash2 } from "lucide-react";
+
+interface TournamentTemplate {
+  id: string;
+  name: string;
+  checkoutRule: CheckoutConfig;
+  drawRule: DrawRule;
+  matchStartConfig: MatchStartConfig;
+  numberOfBoards: number;
+  createdAt: string;
+  createdBy: string;
+  createdByEmail?: string;
+}
 
 export default function TournamentsPage() {
-  const { user, isAuthReady } = useFirebase();
+  const { user, isAuthReady, isAdmin, isSuperAdmin } = useFirebase();
   const router = useRouter();
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [seasons, setSeasons] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<TournamentTemplate[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Form state
   const [title, setTitle] = useState("");
-  const [allowSingleOut, setAllowSingleOut] = useState(false);
-  const [allowDoubleOut, setAllowDoubleOut] = useState(true);
-  const [allowTripleOut, setAllowTripleOut] = useState(false);
-  const [allowDraw, setAllowDraw] = useState(false);
+  const [checkoutConfig, setCheckoutConfig] = useState<CheckoutConfig>(DEFAULT_CHECKOUT_CONFIG);
+  const [drawRule, setDrawRule] = useState<DrawRule>(DEFAULT_DRAW_RULE);
+  const [matchStartConfig, setMatchStartConfig] = useState<MatchStartConfig>(DEFAULT_MATCH_START);
+  const [numberOfBoards, setNumberOfBoards] = useState(1);
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
   const [tournamentNumber, setTournamentNumber] = useState<number | "">("");
   const [isFinalTournament, setIsFinalTournament] = useState(false);
   const [isRetroactive, setIsRetroactive] = useState(false);
+
+  // Grand Final Config (nur wenn isFinalTournament)
+  const [grandFinalQualifiers, setGrandFinalQualifiers] = useState(8);
+  const [grandFinalQF, setGrandFinalQF] = useState("501_bo3");
+  const [grandFinalSF, setGrandFinalSF] = useState("501_bo3");
+  const [grandFinalF, setGrandFinalF] = useState("501_bo5");
+
+  // Template state
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
   useEffect(() => {
     if (!isAuthReady || !user) return;
@@ -73,9 +106,9 @@ export default function TournamentsPage() {
     const unsubscribeTournaments = onSnapshot(
       q,
       (snapshot) => {
-        const allDocs = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as any),
+        const allDocs = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as any),
         }));
         allDocs.sort((a: any, b: any) => {
           const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -84,29 +117,96 @@ export default function TournamentsPage() {
         });
         setTournaments(
           allDocs.filter(
-            (doc) => doc.type !== "single_match" && doc.type !== "casual_tiebreak",
+            (d) => d.type !== "single_match" && d.type !== "casual_tiebreak",
           ),
         );
       },
       (error) => handleFirestoreError(error, OperationType.LIST, "tournaments"),
     );
 
+    // Templates laden (nur für Admins)
+    if (isAdmin) {
+      const unsubTemplates = onSnapshot(
+        collection(db, "templates"),
+        (snap) => {
+          const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as TournamentTemplate[];
+          docs.sort((a, b) => a.name.localeCompare(b.name));
+          setTemplates(docs);
+        },
+        () => { /* Templates sind optional – Fehler ignorieren */ },
+      );
+      return () => {
+        unsubscribeSeasons();
+        unsubscribeTournaments();
+        unsubTemplates();
+      };
+    }
+
     return () => {
       unsubscribeSeasons();
       unsubscribeTournaments();
     };
-  }, [user, isAuthReady]);
+  }, [user, isAuthReady, isAdmin]);
 
   const resetForm = () => {
     setTitle("");
-    setAllowSingleOut(false);
-    setAllowDoubleOut(true);
-    setAllowTripleOut(false);
-    setAllowDraw(false);
+    setCheckoutConfig(DEFAULT_CHECKOUT_CONFIG);
+    setDrawRule(DEFAULT_DRAW_RULE);
+    setMatchStartConfig(DEFAULT_MATCH_START);
+    setNumberOfBoards(1);
     setSelectedSeasonId("");
     setTournamentNumber("");
     setIsFinalTournament(false);
     setIsRetroactive(false);
+    setGrandFinalQualifiers(8);
+    setGrandFinalQF("501_bo3");
+    setGrandFinalSF("501_bo3");
+    setGrandFinalF("501_bo5");
+    setSelectedTemplateId("");
+    setShowSaveTemplate(false);
+    setTemplateName("");
+  };
+
+  const applyTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    if (!templateId) return;
+    const tmpl = templates.find((t) => t.id === templateId);
+    if (!tmpl) return;
+    setCheckoutConfig(tmpl.checkoutRule ?? DEFAULT_CHECKOUT_CONFIG);
+    setDrawRule(tmpl.drawRule ?? DEFAULT_DRAW_RULE);
+    setMatchStartConfig(tmpl.matchStartConfig ?? DEFAULT_MATCH_START);
+    setNumberOfBoards(tmpl.numberOfBoards ?? 1);
+  };
+
+  const deleteTemplate = async (templateId: string) => {
+    try {
+      await deleteDoc(doc(db, "templates", templateId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `templates/${templateId}`);
+    }
+  };
+
+  const saveTemplate = async () => {
+    if (!user || !templateName.trim()) return;
+    setIsSavingTemplate(true);
+    try {
+      await addDoc(collection(db, "templates"), {
+        name: templateName.trim(),
+        checkoutRule: checkoutConfig,
+        drawRule,
+        matchStartConfig,
+        numberOfBoards,
+        createdAt: new Date().toISOString(),
+        createdBy: user.uid,
+        createdByEmail: user.email ?? "",
+      });
+      setShowSaveTemplate(false);
+      setTemplateName("");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "templates");
+    } finally {
+      setIsSavingTemplate(false);
+    }
   };
 
   const createTournament = async () => {
@@ -118,16 +218,22 @@ export default function TournamentsPage() {
       const data: any = {
         title: trimmedTitle,
         status: "draft",
-        allowSingleOut,
-        allowDoubleOut,
-        allowTripleOut,
-        allowDraw,
+        checkoutRule: checkoutConfig,
+        drawRule,
+        matchStartConfig,
+        numberOfBoards,
         createdAt: new Date().toISOString(),
         ownerId: user.uid,
       };
       if (selectedSeasonId) data.seasonId = selectedSeasonId;
       if (isFinalTournament) {
         data.isFinalTournament = true;
+        data.grandFinalConfig = {
+          qualifierCount: grandFinalQualifiers,
+          quarterFormat: grandFinalQF,
+          semiFormat: grandFinalSF,
+          finalFormat: grandFinalF,
+        };
       } else if (tournamentNumber !== "") {
         data.tournamentNumber = Number(tournamentNumber);
       }
@@ -164,6 +270,37 @@ export default function TournamentsPage() {
                   <DialogTitle>Neues Turnier erstellen</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
+
+                  {/* Template laden */}
+                  {isAdmin && templates.length > 0 && (
+                    <div className="grid gap-2">
+                      <Label>Von Template laden</Label>
+                      <div className="flex gap-2">
+                        <select
+                          value={selectedTemplateId}
+                          onChange={(e) => applyTemplate(e.target.value)}
+                          className="flex-1 border border-zinc-200 rounded-md px-3 py-2 text-sm bg-white dark:bg-zinc-900 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500"
+                        >
+                          <option value="">— Kein Template —</option>
+                          {templates.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        {isSuperAdmin && selectedTemplateId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-500 hover:text-red-700 shrink-0"
+                            onClick={() => { deleteTemplate(selectedTemplateId); setSelectedTemplateId(""); }}
+                            title="Template löschen"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid gap-2">
                     <Label htmlFor="title">Turniername *</Label>
                     <Input
@@ -208,6 +345,52 @@ export default function TournamentsPage() {
                               Final-Turnier dieser Season
                             </Label>
                           </div>
+                          {isFinalTournament && (
+                            <div className="mt-3 space-y-3 pl-6 border-l-2 border-yellow-300 dark:border-yellow-600">
+                              <div>
+                                <Label className="text-xs text-zinc-500 font-normal mb-1.5 block">Qualifier-Anzahl</Label>
+                                <div className="flex gap-1.5">
+                                  {[4, 6, 8, 10].map((n) => (
+                                    <button
+                                      key={n}
+                                      type="button"
+                                      onClick={() => setGrandFinalQualifiers(n)}
+                                      className={`w-10 h-8 rounded-md text-sm font-bold transition-colors ${
+                                        grandFinalQualifiers === n
+                                          ? "bg-yellow-500 text-white"
+                                          : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
+                                      }`}
+                                    >
+                                      {n}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="grid gap-1.5">
+                                <Label className="text-xs text-zinc-500 font-normal">KO-Formate</Label>
+                                {[
+                                  { label: "Viertelfinale", value: grandFinalQF, set: setGrandFinalQF },
+                                  { label: "Halbfinale",    value: grandFinalSF, set: setGrandFinalSF },
+                                  { label: "Finale",        value: grandFinalF,  set: setGrandFinalF  },
+                                ].map(({ label, value, set }) => (
+                                  <div key={label} className="flex items-center gap-2">
+                                    <span className="text-xs text-zinc-500 w-24">{label}</span>
+                                    <select
+                                      value={value}
+                                      onChange={(e) => set(e.target.value)}
+                                      className="flex-1 border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1 text-xs bg-white dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                                    >
+                                      <option value="501_bo1">501 · Best of 1</option>
+                                      <option value="501_bo3">501 · Best of 3</option>
+                                      <option value="501_bo5">501 · Best of 5</option>
+                                      <option value="301_bo1">301 · Best of 1</option>
+                                      <option value="301_bo3">301 · Best of 3</option>
+                                    </select>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           {!isFinalTournament && (
                             <div className="flex items-center gap-2">
                               <Label className="whitespace-nowrap font-normal">Turnier Nr.</Label>
@@ -244,33 +427,104 @@ export default function TournamentsPage() {
                     </div>
                   </div>
 
+                  {/* Dartscheiben */}
                   <div className="grid gap-2 pt-2 border-t">
-                    <Label>Out Rules</Label>
-                    {[
-                      { id: "singleOut", checked: allowSingleOut, onChange: setAllowSingleOut, label: "Single Out (incl. Bull)" },
-                      { id: "doubleOut", checked: allowDoubleOut, onChange: setAllowDoubleOut, label: "Double Out (incl. Bull's Eye)" },
-                      { id: "tripleOut", checked: allowTripleOut, onChange: setAllowTripleOut, label: "Triple Out (incl. Bull's Eye)" },
-                    ].map(({ id, checked, onChange, label }) => (
-                      <div key={id} className="flex items-center gap-2">
-                        <input type="checkbox" id={id} checked={checked} onChange={(e) => onChange(e.target.checked)} />
-                        <Label htmlFor={id} className="font-normal">{label}</Label>
-                      </div>
-                    ))}
+                    <Label>Dartscheiben</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setNumberOfBoards(n)}
+                          className={`w-10 h-10 rounded-lg text-sm font-bold transition-colors ${
+                            numberOfBoards === n
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      Wie viele Dartscheiben stehen gleichzeitig zur Verfügung?
+                    </p>
                   </div>
-                  <div className="grid gap-2">
-                    <Label>Match Rules</Label>
-                    <div className="flex items-center gap-2">
+
+                  <div className="grid gap-2 pt-2 border-t">
+                    <Label>Checkout-Regel</Label>
+                    <CheckoutBuilder
+                      value={checkoutConfig}
+                      onChange={setCheckoutConfig}
+                      showInRule={true}
+                    />
+                  </div>
+
+                  <div className="grid gap-2 pt-2 border-t">
+                    <Label>Draw-Regel</Label>
+                    <div className="flex items-start gap-2">
                       <input
                         type="checkbox"
-                        id="allowDraw"
-                        checked={allowDraw}
-                        onChange={(e) => setAllowDraw(e.target.checked)}
+                        id="drawEnabled"
+                        checked={drawRule.enabled}
+                        onChange={(e) => setDrawRule({ enabled: e.target.checked })}
+                        className="mt-0.5"
                       />
-                      <Label htmlFor="allowDraw" className="font-normal">
-                        Allow Draw (Best of 1 only)
-                      </Label>
+                      <div>
+                        <Label htmlFor="drawEnabled" className="font-normal">
+                          Unentschieden erlaubt (Best of 1)
+                        </Label>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Spieler 2 darf nach dem Checkout von Spieler 1 noch seinen Wurf vollenden.
+                        </p>
+                      </div>
                     </div>
                   </div>
+
+                  <div className="grid gap-2 pt-2 border-t">
+                    <Label>Anwurf-Konfiguration</Label>
+                    <MatchStartSelector
+                      value={matchStartConfig}
+                      onChange={setMatchStartConfig}
+                    />
+                  </div>
+
+                  {/* Als Template speichern */}
+                  {isAdmin && (
+                    <div className="pt-2 border-t">
+                      {showSaveTemplate ? (
+                        <div className="flex gap-2">
+                          <Input
+                            value={templateName}
+                            onChange={(e) => setTemplateName(e.target.value)}
+                            placeholder="Template-Name"
+                            maxLength={60}
+                            className="flex-1"
+                            onKeyDown={(e) => { if (e.key === 'Enter') saveTemplate(); if (e.key === 'Escape') setShowSaveTemplate(false); }}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={saveTemplate}
+                            disabled={isSavingTemplate || !templateName.trim()}
+                          >
+                            {isSavingTemplate ? "..." : "Speichern"}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setShowSaveTemplate(false)}>
+                            ✕
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowSaveTemplate(true)}
+                          className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                        >
+                          + Als Template speichern
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>
@@ -313,6 +567,11 @@ export default function TournamentsPage() {
                   {t.isRetroactive && (
                     <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-orange-100 text-orange-700">
                       Retroaktiv
+                    </div>
+                  )}
+                  {t.numberOfBoards > 1 && (
+                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-zinc-100 text-zinc-600">
+                      🎯 {t.numberOfBoards} Scheiben
                     </div>
                   )}
                 </CardContent>

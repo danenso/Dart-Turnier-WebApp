@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-errors";
 import { ArrowUp, ArrowDown, Check, Play } from "lucide-react";
+import { SpinWheel } from "@/components/SpinWheel";
 
 interface TiebreakProps {
   tournamentId: string;
@@ -28,6 +28,9 @@ export function TiebreakManager({
       ? manualOrder || tiebreak.playerIds
       : tiebreak.playerIds;
 
+  const showSpinWheel =
+    tiebreak.status === "pending" && !tiebreak.spinWheelShown;
+
   const movePlayer = (index: number, direction: "up" | "down") => {
     if (!isAdmin || tiebreak.status !== "pending") return;
     const newOrder = [...order];
@@ -45,6 +48,22 @@ export function TiebreakManager({
     setManualOrder(newOrder);
   };
 
+  const confirmSpinWheel = async () => {
+    if (!isAdmin) return;
+    try {
+      await updateDoc(
+        doc(db, "tournaments", tournamentId, "tiebreaks", tiebreak.id),
+        { spinWheelShown: true },
+      );
+    } catch (error) {
+      handleFirestoreError(
+        error,
+        OperationType.UPDATE,
+        `tournaments/${tournamentId}/tiebreaks/${tiebreak.id}`,
+      );
+    }
+  };
+
   const startTiebreak = async () => {
     if (!isAdmin) return;
     try {
@@ -52,7 +71,7 @@ export function TiebreakManager({
         doc(db, "tournaments", tournamentId, "tiebreaks", tiebreak.id),
         {
           status: "in_progress",
-          playerIds: order, // Save the manual order
+          playerIds: order,
           currentRound: 1,
           scores: {},
         },
@@ -66,42 +85,26 @@ export function TiebreakManager({
     }
   };
 
-  const handleScoreChange = (
-    playerId: string,
-    round: number,
-    value: string,
-  ) => {
-    const num = parseInt(value);
-    if (isNaN(num) || num < 0 || num > 3) return;
-
+  const setScore = (playerId: string, round: number, value: number) => {
     setScores((prev) => ({
       ...prev,
-      [playerId]: {
-        ...(prev[playerId] || {}),
-        [round]: num,
-      },
+      [playerId]: { ...(prev[playerId] || {}), [round]: value },
     }));
   };
 
   const saveRound = async () => {
     if (!isAdmin) return;
-
-    // Check if all active players have a score for the current round
     const activePlayers = getActivePlayersForRound(tiebreak.currentRound);
     for (const pId of activePlayers) {
       if (scores[pId]?.[tiebreak.currentRound] === undefined) {
-        alert("Please enter scores for all active players.");
+        alert("Bitte Treffer für alle aktiven Spieler eingeben.");
         return;
       }
     }
-
     try {
       await updateDoc(
         doc(db, "tournaments", tournamentId, "tiebreaks", tiebreak.id),
-        {
-          scores,
-          currentRound: tiebreak.currentRound + 1,
-        },
+        { scores, currentRound: tiebreak.currentRound + 1 },
       );
     } catch (error) {
       handleFirestoreError(
@@ -114,21 +117,14 @@ export function TiebreakManager({
 
   const completeTiebreak = async () => {
     if (!isAdmin) return;
-
-    // Calculate final placements
     const placements = calculatePlacements();
-    // Check if there are still ties
     const hasTies = placements.some(
       (p: any, i: number, arr: any[]) => i > 0 && p.total === arr[i - 1].total,
     );
-
     if (hasTies) {
-      alert(
-        "There are still ties. Please play another round for the tied players.",
-      );
+      alert("Es gibt noch Gleichstände. Bitte eine weitere Runde spielen.");
       return;
     }
-
     try {
       await updateDoc(
         doc(db, "tournaments", tournamentId, "tiebreaks", tiebreak.id),
@@ -147,40 +143,30 @@ export function TiebreakManager({
     }
   };
 
-  // Determine which players are still tied and need to play this round
   const getActivePlayersForRound = (round: number) => {
-    if (round <= 3) return tiebreak.playerIds; // Everyone plays first 3 rounds
-
-    // For round > 3, only players who are tied with someone else play
+    if (round <= 3) return tiebreak.playerIds;
     const totals = tiebreak.playerIds.map((id: string) => {
       let total = 0;
-      for (let r = 1; r < round; r++) {
-        total += scores[id]?.[r] || 0;
-      }
+      for (let r = 1; r < round; r++) total += scores[id]?.[r] || 0;
       return { id, total };
     });
-
     const activeIds = new Set<string>();
     totals.forEach((t1: any) => {
       totals.forEach((t2: any) => {
-        if (t1.id !== t2.id && t1.total === t2.total) {
-          activeIds.add(t1.id);
-        }
+        if (t1.id !== t2.id && t1.total === t2.total) activeIds.add(t1.id);
       });
     });
-
     return Array.from(activeIds);
   };
 
-  const calculatePlacements = () => {
-    return tiebreak.playerIds
+  const calculatePlacements = () =>
+    tiebreak.playerIds
       .map((id: string) => {
         let total = 0;
-        Object.values(scores[id] || {}).forEach((val) => (total += val));
+        Object.values(scores[id] || {}).forEach((val) => (total += val as number));
         return { id, total };
       })
       .sort((a: any, b: any) => b.total - a.total);
-  };
 
   const getPlayerName = (id: string) => {
     const idx = tiebreak.playerIds.indexOf(id);
@@ -191,17 +177,38 @@ export function TiebreakManager({
     <Card className="mb-6">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Tiebreak Group</span>
+          <span>Tiebreak-Gruppe</span>
           <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm">
-            Target: {tiebreak.targetNumber}
+            Zielzahl: {tiebreak.targetNumber}
           </span>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {tiebreak.status === "pending" ? (
+        {/* SpinWheel-Phase: Losung noch nicht bestätigt */}
+        {showSpinWheel && (
+          <div className="py-2">
+            {isAdmin ? (
+              <SpinWheel
+                targetNumber={tiebreak.targetNumber}
+                onComplete={confirmSpinWheel}
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <p className="text-sm text-zinc-500">
+                  Der Admin lost gerade die Zielzahl aus…
+                </p>
+                <div className="text-4xl font-black text-zinc-300">?</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Reihenfolge-Phase: Losung bestätigt, noch nicht gestartet */}
+        {tiebreak.status === "pending" && tiebreak.spinWheelShown && (
           <div className="space-y-4">
             <p className="text-sm text-zinc-500">
-              Set the throwing order for the tiebreak.
+              Wurffolge für den Tiebreak festlegen (3 Pfeile auf{" "}
+              <strong>{tiebreak.targetNumber}</strong>).
             </p>
             {order.map((pId: string, idx: number) => (
               <div
@@ -235,17 +242,20 @@ export function TiebreakManager({
             ))}
             {isAdmin && (
               <Button onClick={startTiebreak} className="w-full mt-4">
-                <Play className="w-4 h-4 mr-2" /> Start Tiebreak
+                <Play className="w-4 h-4 mr-2" /> Tiebreak starten
               </Button>
             )}
           </div>
-        ) : (
+        )}
+
+        {/* Spielphase */}
+        {tiebreak.status !== "pending" && (
           <div className="space-y-6">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs text-zinc-500 uppercase bg-zinc-50 dark:bg-zinc-900">
                   <tr>
-                    <th className="px-4 py-2">Player</th>
+                    <th className="px-4 py-2">Spieler</th>
                     {Array.from({
                       length: Math.max(3, tiebreak.currentRound),
                     }).map((_, i) => (
@@ -253,7 +263,7 @@ export function TiebreakManager({
                         R{i + 1}
                       </th>
                     ))}
-                    <th className="px-4 py-2 text-center font-bold">Total</th>
+                    <th className="px-4 py-2 text-center font-bold">Gesamt</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -277,22 +287,23 @@ export function TiebreakManager({
                             getActivePlayersForRound(round).includes(pId);
 
                           return (
-                            <td key={round} className="px-4 py-2 text-center">
+                            <td key={round} className="px-2 py-2 text-center">
                               {isActive && isAdmin ? (
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="3"
-                                  className="w-16 mx-auto text-center"
-                                  value={scores[pId]?.[round] ?? ""}
-                                  onChange={(e) =>
-                                    handleScoreChange(
-                                      pId,
-                                      round,
-                                      e.target.value,
-                                    )
-                                  }
-                                />
+                                <div className="flex justify-center gap-1">
+                                  {[0, 1, 2, 3].map((v) => (
+                                    <button
+                                      key={v}
+                                      onClick={() => setScore(pId, round, v)}
+                                      className={`w-8 h-8 rounded text-sm font-bold transition-colors ${
+                                        scores[pId]?.[round] === v
+                                          ? "bg-primary text-primary-foreground"
+                                          : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                                      }`}
+                                    >
+                                      {v}
+                                    </button>
+                                  ))}
+                                </div>
                               ) : (
                                 <span>{score !== undefined ? score : "-"}</span>
                               )}
@@ -309,17 +320,24 @@ export function TiebreakManager({
               </table>
             </div>
 
+            {tiebreak.status === "in_progress" && (
+              <p className="text-xs text-zinc-400 text-center">
+                Runde {tiebreak.currentRound} · 3 Pfeile auf Zahl{" "}
+                <strong>{tiebreak.targetNumber}</strong>
+              </p>
+            )}
+
             {tiebreak.status === "in_progress" && isAdmin && (
               <div className="flex justify-end gap-4">
                 <Button onClick={saveRound} variant="outline">
-                  Save Round {tiebreak.currentRound}
+                  Runde {tiebreak.currentRound} speichern
                 </Button>
                 {tiebreak.currentRound >= 3 && (
                   <Button
                     onClick={completeTiebreak}
                     className="bg-green-600 hover:bg-green-700"
                   >
-                    <Check className="w-4 h-4 mr-2" /> Complete Tiebreak
+                    <Check className="w-4 h-4 mr-2" /> Tiebreak abschließen
                   </Button>
                 )}
               </div>
@@ -329,7 +347,7 @@ export function TiebreakManager({
               <div className="bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-400 p-4 rounded-lg flex items-center gap-2">
                 <Check className="w-5 h-5" />
                 <span className="font-medium">
-                  Tiebreak completed. Final order determined.
+                  Tiebreak abgeschlossen. Reihenfolge festgestellt.
                 </span>
               </div>
             )}
