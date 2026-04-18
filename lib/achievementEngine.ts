@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, collection, query, where, getDocs } from 'firebase/firestore';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -189,6 +189,35 @@ export async function grantTournamentAchievements(
   // Matchday winner (stackable)
   await grantAchievement(winner.id, 'matchday-winner', { ...baseCtx, placement: 1 });
 
+  // Hat-Trick: check if winner has won the previous 2 consecutive matchdays in this season
+  if (tournament.tournamentNumber && tournament.tournamentNumber >= 3) {
+    try {
+      const winnerRef = doc(db, 'players', winner.id);
+      const winnerSnap = await getDoc(winnerRef);
+      const earned: EarnedAchievement[] = winnerSnap.data()?.earnedAchievements ?? [];
+      const seasonWins = earned
+        .filter((a) => a.id === 'matchday-winner' && a.context.seasonId === tournament.seasonId)
+        .map((a) => a.context.tournamentNumber as number)
+        .filter(Boolean)
+        .sort((a, b) => a - b);
+      // Include the current win (just granted via arrayUnion)
+      if (!seasonWins.includes(tournament.tournamentNumber)) {
+        seasonWins.push(tournament.tournamentNumber);
+        seasonWins.sort((a, b) => a - b);
+      }
+      // Check for 3 consecutive numbers ending at current
+      const cur = tournament.tournamentNumber;
+      if (seasonWins.includes(cur - 1) && seasonWins.includes(cur - 2)) {
+        await grantAchievement(winner.id, 'matchday-hat-trick', {
+          seasonId: tournament.seasonId,
+          tournamentNumbers: [cur - 2, cur - 1, cur],
+        });
+      }
+    } catch (_) {
+      // Non-critical
+    }
+  }
+
   // Perfect group: won every group match
   const groupMatches = matches.filter(
     (m) => m.phase === 'group' && m.status === 'completed',
@@ -303,5 +332,41 @@ export async function grantSeasonAchievements(
       seasonName,
       rank: i + 1,
     });
+  }
+
+  // Iron Man: check if any player participated in ALL regular matchdays
+  try {
+    const tournsSnap = await getDocs(
+      query(collection(db, 'tournaments'), where('seasonId', '==', seasonId)),
+    );
+    const regularTourns = tournsSnap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as any) }))
+      .filter((t) => t.status === 'completed' && !t.isFinalTournament);
+
+    if (regularTourns.length >= 3) {
+      // Build participation map: playerId → set of tournament IDs they played in
+      const participation = new Map<string, Set<string>>();
+      for (const tourn of regularTourns) {
+        const playersSnap = await getDocs(collection(db, 'tournaments', tourn.id, 'players'));
+        for (const pd of playersSnap.docs) {
+          const set = participation.get(pd.id) ?? new Set();
+          set.add(tourn.id);
+          participation.set(pd.id, set);
+        }
+      }
+
+      // Grant to players who played in every regular tournament
+      for (const [playerId, tournSet] of participation) {
+        if (tournSet.size === regularTourns.length) {
+          await grantAchievement(playerId, 'iron-man', {
+            seasonId,
+            seasonName,
+            matchdaysPlayed: regularTourns.length,
+          });
+        }
+      }
+    }
+  } catch (_) {
+    // Non-critical
   }
 }

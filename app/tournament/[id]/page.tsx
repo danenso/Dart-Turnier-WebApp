@@ -58,6 +58,10 @@ export default function TournamentPage() {
   const [retroPairs, setRetroPairs] = useState<RetroPair[]>([]);
   const [retroScores, setRetroScores] = useState<Record<string, { legsA: number; legsB: number }>>({});
   const [isSavingRetroMatches, setIsSavingRetroMatches] = useState(false);
+  // Retroaktiv – Nur Platzierungen
+  const [retroMode, setRetroMode] = useState<'matches' | 'placements'>('matches');
+  const [retroPlacements, setRetroPlacements] = useState<Record<number, string>>({}); // placement → playerId
+  const [retroParticipants, setRetroParticipants] = useState<string[]>([]); // playerIds who participated
 
   // Settings-Edit-Dialog
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -606,6 +610,9 @@ export default function TournamentPage() {
       setRetroFormat('501_bo3');
     }
 
+    setRetroMode('matches');
+    setRetroPlacements({});
+    setRetroParticipants([]);
     setIsRetroMatchDialogOpen(true);
   };
 
@@ -696,6 +703,88 @@ export default function TournamentPage() {
           { ...tournament, seasonId: tournament.seasonId },
           players,
           [],  // Retroaktive Turniere haben keine Match-Dokumente für perfect-group
+        );
+      } catch (_) {
+        // Achievement errors don't block completion
+      }
+
+      setIsRetroMatchDialogOpen(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `tournaments/${id}`);
+    } finally {
+      setIsSavingRetroMatches(false);
+    }
+  };
+
+  const saveRetroPlacements = async () => {
+    if (!user) return;
+    setIsSavingRetroMatches(true);
+    try {
+      // Bestehende Matches löschen
+      for (const m of matches.filter((m) => m.phase === 'group')) {
+        await deleteDoc(doc(db, "tournaments", id, "matches", m.id));
+      }
+
+      // Alle Teilnehmer = explizite Placements + retroParticipants
+      const placedIds = Object.values(retroPlacements).filter(Boolean);
+      const allParticipantIds = [...new Set([...placedIds, ...retroParticipants])];
+
+      // Punkte nach Konzept: 1. → 7 (5+1+1), 2. → 6 (4+1+1), 3. → 4 (3+1), 4. → 3 (2+1), Rest → 1
+      const pointsByPlacement: Record<number, number> = { 1: 7, 2: 6, 3: 4, 4: 3 };
+
+      // Player-Dokumente updaten
+      for (const p of players) {
+        const placement = Object.entries(retroPlacements).find(([, pid]) => pid === p.id);
+        const placementNum = placement ? parseInt(placement[0]) : 0;
+        const participated = allParticipantIds.includes(p.id);
+        if (!participated) continue;
+
+        const points = placementNum > 0 ? (pointsByPlacement[placementNum] ?? 1) : 1;
+        const wins = placementNum === 1 ? 1 : 0;
+
+        await setDoc(doc(db, "tournaments", id, "players", p.id), {
+          name: p.name,
+          points,
+          matchesPlayed: 1,
+          wins,
+          draws: 0,
+          losses: placementNum > 1 ? 1 : 0,
+          placement: placementNum || undefined,
+        });
+      }
+
+      // Turnier abschließen
+      await updateDoc(doc(db, "tournaments", id), {
+        status: "completed",
+        ...(tournament.seasonId ? { seasonId: tournament.seasonId } : {}),
+        ...(tournament.tournamentNumber !== undefined ? { tournamentNumber: tournament.tournamentNumber } : {}),
+        ...(tournament.isFinalTournament ? { isFinalTournament: true } : {}),
+        isRetroactive: true,
+        entryMode: 'placements-only',
+      });
+
+      // Achievements vergeben – Spieler nach Platzierung sortiert
+      try {
+        const sortedByPlacement = allParticipantIds
+          .map((pid) => {
+            const pl = Object.entries(retroPlacements).find(([, id]) => id === pid);
+            const p = players.find((p) => p.id === pid);
+            return {
+              id: pid,
+              name: p?.name ?? '',
+              placement: pl ? parseInt(pl[0]) : 99,
+              points: pl ? (pointsByPlacement[parseInt(pl[0])] ?? 1) : 1,
+              wins: pl && parseInt(pl[0]) === 1 ? 1 : 0,
+              losses: 0,
+            };
+          })
+          .sort((a, b) => a.placement - b.placement);
+
+        await grantTournamentAchievements(
+          id,
+          { ...tournament, seasonId: tournament.seasonId },
+          sortedByPlacement,
+          [],
         );
       } catch (_) {
         // Achievement errors don't block completion
@@ -1570,12 +1659,40 @@ export default function TournamentPage() {
         <Dialog open={isRetroMatchDialogOpen} onOpenChange={setIsRetroMatchDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Matches eintragen – {tournament.title}</DialogTitle>
+              <DialogTitle>Ergebnisse eintragen – {tournament.title}</DialogTitle>
               <DialogDescription>
-                Trage für jedes Match die Leg-Ergebnisse ein. Nicht gespielte Matches einfach leer lassen.
+                {retroMode === 'matches'
+                  ? 'Trage für jedes Match die Leg-Ergebnisse ein. Nicht gespielte Matches leer lassen.'
+                  : 'Trage nur die Top-Platzierungen ein. Punkte werden automatisch berechnet.'}
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
+              {/* Modus-Auswahl */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setRetroMode('matches')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
+                    retroMode === 'matches'
+                      ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-transparent'
+                      : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-500'
+                  }`}
+                >
+                  Alle Ergebnisse
+                </button>
+                <button
+                  onClick={() => setRetroMode('placements')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
+                    retroMode === 'placements'
+                      ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-transparent'
+                      : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-500'
+                  }`}
+                >
+                  Nur Platzierungen
+                </button>
+              </div>
+
+              {retroMode === 'matches' && (
+              <>
               {/* Format-Auswahl */}
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap">Format:</span>
@@ -1663,14 +1780,84 @@ export default function TournamentPage() {
               <p className="text-xs text-zinc-400">
                 {Object.keys(retroScores).length} von {retroPairs.length} Matches eingetragen · Standings werden automatisch kalkuliert
               </p>
+              </>
+              )}
+
+              {retroMode === 'placements' && (
+              <>
+              {/* Platzierungen */}
+              <div className="space-y-2">
+                {[1, 2, 3, 4].map((placement) => {
+                  const medalIcons = ['🥇', '🥈', '🥉', '4.'];
+                  const pointLabels = ['7 Pkt', '6 Pkt', '4 Pkt', '3 Pkt'];
+                  const usedIds = Object.values(retroPlacements).filter(Boolean);
+                  return (
+                    <div key={placement} className="flex items-center gap-3">
+                      <span className="text-lg w-8 text-center">{medalIcons[placement - 1]}</span>
+                      <select
+                        value={retroPlacements[placement] ?? ''}
+                        onChange={(e) => setRetroPlacements((prev) => ({ ...prev, [placement]: e.target.value }))}
+                        className="flex-1 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-2 text-sm bg-white dark:bg-zinc-900"
+                      >
+                        <option value="">– Spieler wählen –</option>
+                        {players
+                          .filter((p) => !usedIds.includes(p.id) || retroPlacements[placement] === p.id)
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                      </select>
+                      <span className="text-xs text-zinc-400 w-12">{pointLabels[placement - 1]}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Weitere Teilnehmer */}
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Weitere Teilnehmer (je 1 Pkt)</p>
+                <div className="flex flex-wrap gap-2">
+                  {players
+                    .filter((p) => !Object.values(retroPlacements).includes(p.id))
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((p) => {
+                      const active = retroParticipants.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setRetroParticipants((prev) =>
+                            active ? prev.filter((id) => id !== p.id) : [...prev, p.id]
+                          )}
+                          className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                            active
+                              ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-transparent'
+                              : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:border-zinc-400'
+                          }`}
+                        >
+                          {p.name}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              <p className="text-xs text-zinc-400">
+                {Object.values(retroPlacements).filter(Boolean).length} Platzierungen + {retroParticipants.length} weitere Teilnehmer
+              </p>
+              </>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsRetroMatchDialogOpen(false)}>
                 Abbrechen
               </Button>
               <Button
-                onClick={saveRetroMatches}
-                disabled={isSavingRetroMatches || Object.keys(retroScores).length === 0}
+                onClick={retroMode === 'matches' ? saveRetroMatches : saveRetroPlacements}
+                disabled={isSavingRetroMatches || (
+                  retroMode === 'matches'
+                    ? Object.keys(retroScores).length === 0
+                    : !retroPlacements[1]
+                )}
                 className="bg-orange-600 hover:bg-orange-700"
               >
                 {isSavingRetroMatches ? "Speichert..." : "Turnier abschließen"}

@@ -76,6 +76,7 @@ service cloud.firestore {
              (!('tournamentNumber' in data) || data.tournamentNumber is number) &&
              (!('isFinalTournament' in data) || data.isFinalTournament is bool) &&
              (!('isRetroactive' in data) || data.isRetroactive is bool) &&
+             (!('entryMode' in data) || data.entryMode is string) &&
              (!('participantUids' in data) || data.participantUids is list) &&
              (!('drawRule' in data) || data.drawRule is map) &&
              (!('matchStartConfig' in data) || data.matchStartConfig is map) &&
@@ -102,7 +103,8 @@ service cloud.firestore {
              data.losses is number && data.losses >= 0 &&
              (!('groupId' in data) || data.groupId is string) &&
              (!('rank' in data) || data.rank is number) &&
-             (!('seed' in data) || data.seed is number);
+             (!('seed' in data) || data.seed is number) &&
+             (!('placement' in data) || data.placement is number);
     }
 
     function isValidMatch(data) {

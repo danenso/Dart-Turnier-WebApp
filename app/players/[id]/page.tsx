@@ -20,6 +20,7 @@ import { ScoreDistribution } from '@/components/player/ScoreDistribution';
 import { HighScoresSection } from '@/components/player/HighScoresSection';
 import { FieldStatsSection } from '@/components/player/FieldStatsSection';
 import { CheckoutStatsSection } from '@/components/player/CheckoutStatsSection';
+import { TrophyShowcase } from '@/components/player/TrophyShowcase';
 
 type FilterType = 'all' | GameType;
 
@@ -138,6 +139,11 @@ export default function PlayerStatsPage() {
           <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-700 dark:text-amber-400">
             ⚠️ {error}
           </div>
+        )}
+
+        {/* Trophäen-Vitrine */}
+        {leagueAchievements.length > 0 && (
+          <TrophyShowcase achievements={leagueAchievements} />
         )}
 
         {/* Letzte Spiele + Achievements */}
