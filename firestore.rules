@@ -81,7 +81,8 @@ service cloud.firestore {
              (!('drawRule' in data) || data.drawRule is map) &&
              (!('matchStartConfig' in data) || data.matchStartConfig is map) &&
              (!('numberOfBoards' in data) || (data.numberOfBoards is number && data.numberOfBoards >= 1 && data.numberOfBoards <= 8)) &&
-             (!('grandFinalConfig' in data) || data.grandFinalConfig is map);
+             (!('grandFinalConfig' in data) || data.grandFinalConfig is map) &&
+             (!('phaseFormats' in data) || data.phaseFormats is map);
     }
 
     function isValidSeason(data) {
@@ -170,9 +171,13 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid
                     && request.resource.data.name is string
-                    && (!('abbreviation' in request.resource.data) || request.resource.data.abbreviation is string);
+                    && (!('abbreviation' in request.resource.data) || request.resource.data.abbreviation is string)
+                    && (!('themeColor' in request.resource.data) || request.resource.data.themeColor is string)
+                    && (!('scoringRules' in request.resource.data) || request.resource.data.scoringRules is map);
       allow update: if (isOwner(resource.data.ownerId) || isAdmin())
-                    && (!('abbreviation' in request.resource.data) || request.resource.data.abbreviation is string);
+                    && (!('abbreviation' in request.resource.data) || request.resource.data.abbreviation is string)
+                    && (!('themeColor' in request.resource.data) || request.resource.data.themeColor is string)
+                    && (!('scoringRules' in request.resource.data) || request.resource.data.scoringRules is map);
       allow delete: if isOwner(resource.data.ownerId) || isAdmin();
 
       match /seasons/{seasonId} {

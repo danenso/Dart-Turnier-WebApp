@@ -45,8 +45,8 @@ export const DEFAULT_THEME_SETTINGS: ThemeCustomSettings = {
 export const ICON_MAP = {
   logo:       { mdi: "mdi:bullseye",            lucide: "lucide:target",         tabler: "tabler:target",         ph: "ph:crosshair-simple",   heroicons: "heroicons:viewfinder-circle" },
   casual:     { mdi: "mdi:bullseye-arrow",       lucide: "lucide:crosshair",      tabler: "tabler:target-arrow",   ph: "ph:target",             heroicons: "heroicons:cursor-arrow-rays" },
-  tournaments:{ mdi: "mdi:trophy",               lucide: "lucide:trophy",         tabler: "tabler:trophy",         ph: "ph:trophy",             heroicons: "heroicons:trophy" },
-  liga:       { mdi: "mdi:podium-gold",          lucide: "lucide:bar-chart-2",    tabler: "tabler:podium",         ph: "ph:crown-simple",       heroicons: "heroicons:star" },
+  tournaments:{ mdi: "mdi:podium-gold",          lucide: "lucide:bar-chart-2",    tabler: "tabler:podium",         ph: "ph:crown-simple",       heroicons: "heroicons:star" },
+  liga:       { mdi: "mdi:trophy",               lucide: "lucide:trophy",         tabler: "tabler:trophy",         ph: "ph:trophy",             heroicons: "heroicons:trophy" },
   players:    { mdi: "mdi:account-group",        lucide: "lucide:users",          tabler: "tabler:users",          ph: "ph:users",              heroicons: "heroicons:users" },
   standings:  { mdi: "mdi:chart-bar",            lucide: "lucide:bar-chart-2",    tabler: "tabler:chart-bar",      ph: "ph:chart-bar",          heroicons: "heroicons:chart-bar" },
   seasons:    { mdi: "mdi:calendar-range",       lucide: "lucide:calendar-range", tabler: "tabler:calendar-stats", ph: "ph:calendar",           heroicons: "heroicons:calendar" },

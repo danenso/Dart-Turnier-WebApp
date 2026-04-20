@@ -56,10 +56,16 @@ import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface ScoringRules {
+  [key: string]: number; // "1" → 7, "2" → 6, etc. + "participation", "stayedUntilFinal"
+}
+
 interface LigaDoc {
   id: string;
   name: string;
   abbreviation?: string;
+  themeColor?: string;
+  scoringRules?: ScoringRules;
   gamesPerSeason: number;
   bannerUrl: string | null;
   bannerType: "image" | "video" | null;
@@ -170,6 +176,10 @@ export default function LigaDetailPage() {
   const [settingsName, setSettingsName] = useState("");
   const [settingsAbbr, setSettingsAbbr] = useState("");
   const [settingsGames, setSettingsGames] = useState(10);
+  const [settingsThemeColor, setSettingsThemeColor] = useState("#10b981");
+  const [settingsScoringRules, setSettingsScoringRules] = useState<ScoringRules>({
+    "1": 7, "2": 6, "3": 4, "4": 3, "5": 2, participation: 1, stayedUntilFinal: 1,
+  });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // ── Delete dialog ──
@@ -375,6 +385,8 @@ export default function LigaDetailPage() {
         name: settingsName.trim(),
         abbreviation: settingsAbbr.trim().toUpperCase() || null,
         gamesPerSeason: settingsGames,
+        themeColor: settingsThemeColor || null,
+        scoringRules: settingsScoringRules,
       });
       setIsSettingsOpen(false);
     } catch (err) {
@@ -534,6 +546,8 @@ export default function LigaDetailPage() {
                   setSettingsName(liga.name);
                   setSettingsAbbr(liga.abbreviation ?? "");
                   setSettingsGames(liga.gamesPerSeason);
+                  setSettingsThemeColor(liga.themeColor ?? "#10b981");
+                  setSettingsScoringRules(liga.scoringRules ?? { "1": 7, "2": 6, "3": 4, "4": 3, "5": 2, participation: 1, stayedUntilFinal: 1 });
                   setIsSettingsOpen(true);
                 }}
               >
@@ -892,6 +906,66 @@ export default function LigaDetailPage() {
                 onChange={(e) => setSettingsGames(Number(e.target.value))}
               />
               <p className="text-xs text-zinc-400">Gilt nur für neu erstellte Seasons.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Theme-Farbe</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={settingsThemeColor}
+                  onChange={(e) => setSettingsThemeColor(e.target.value)}
+                  className="w-10 h-10 rounded-lg border border-zinc-200 dark:border-zinc-700 cursor-pointer p-0.5"
+                />
+                <div className="flex gap-1.5 flex-wrap">
+                  {["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setSettingsThemeColor(c)}
+                      className={`w-7 h-7 rounded-full border-2 transition-all ${settingsThemeColor === c ? "border-zinc-900 dark:border-white scale-110" : "border-transparent"}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-zinc-400">Markiert die Liga-Karten und zugehörige Turniere.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Punkte-Vergabe (Platzierung → Punkte)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {["1", "2", "3", "4", "5"].map((place) => (
+                  <div key={place} className="flex items-center gap-2">
+                    <span className="text-sm text-zinc-500 w-14">{place}. Platz</span>
+                    <Input
+                      type="number" min={0} max={20}
+                      className="w-20 h-8 text-sm"
+                      value={settingsScoringRules[place] ?? 0}
+                      onChange={(e) => setSettingsScoringRules((prev) => ({ ...prev, [place]: Number(e.target.value) }))}
+                    />
+                    <span className="text-xs text-zinc-400">Pkt</span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-zinc-500 w-14">Teiln.</span>
+                  <Input
+                    type="number" min={0} max={10}
+                    className="w-20 h-8 text-sm"
+                    value={settingsScoringRules.participation ?? 1}
+                    onChange={(e) => setSettingsScoringRules((prev) => ({ ...prev, participation: Number(e.target.value) }))}
+                  />
+                  <span className="text-xs text-zinc-400">Pkt</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-zinc-500 w-14">Finale</span>
+                  <Input
+                    type="number" min={0} max={10}
+                    className="w-20 h-8 text-sm"
+                    value={settingsScoringRules.stayedUntilFinal ?? 1}
+                    onChange={(e) => setSettingsScoringRules((prev) => ({ ...prev, stayedUntilFinal: Number(e.target.value) }))}
+                  />
+                  <span className="text-xs text-zinc-400">Pkt (bis Finale)</span>
+                </div>
+              </div>
+              <p className="text-xs text-zinc-400">Punkte pro Platzierung in der Saisonwertung. Teiln. = Teilnahme-Bonus, Finale = Bonus für &quot;bis zum Finale geblieben&quot;.</p>
             </div>
           </div>
           <DialogFooter>

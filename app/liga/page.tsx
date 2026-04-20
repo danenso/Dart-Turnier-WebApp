@@ -33,6 +33,7 @@ interface LigaDoc {
   id: string;
   name: string;
   abbreviation?: string;
+  themeColor?: string;
   gamesPerSeason: number;
   bannerUrl: string | null;
   bannerType: "image" | "video" | null;
@@ -103,6 +104,7 @@ export default function LigaOverviewPage() {
         gamesPerSeason: Number(createGames) || 10,
         bannerUrl: null,
         bannerType: null,
+        scoringRules: { "1": 7, "2": 6, "3": 4, "4": 3, "5": 2, participation: 1, stayedUntilFinal: 1 },
         ownerId: user.uid,
         createdAt: new Date().toISOString(),
       });
@@ -177,7 +179,10 @@ export default function LigaOverviewPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {ligen.map((liga) => (
             <Link key={liga.id} href={`/liga/${liga.id}`} className="group block">
-              <div className="relative bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all duration-200">
+              <div
+                className="relative bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden hover:shadow-md transition-all duration-200"
+                style={liga.themeColor ? { borderTopColor: liga.themeColor, borderTopWidth: 3 } : undefined}
+              >
 
                 {/* Banner strip or gradient fallback */}
                 {liga.bannerUrl && liga.bannerType === "image" ? (

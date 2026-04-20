@@ -36,7 +36,7 @@ import { CheckoutBuilder } from "@/components/CheckoutBuilder";
 import { CheckoutConfig, DEFAULT_CHECKOUT_CONFIG } from "@/lib/checkout-rules";
 import { MatchStartSelector } from "@/components/MatchStartSelector";
 import { DrawRule, MatchStartConfig, DEFAULT_DRAW_RULE, DEFAULT_MATCH_START } from "@/lib/match-rules";
-import { Trash2 } from "lucide-react";
+import { Trash2, LayoutGrid, List } from "lucide-react";
 
 interface TournamentTemplate {
   id: string;
@@ -70,6 +70,12 @@ export default function TournamentsPage() {
   const [isFinalTournament, setIsFinalTournament] = useState(false);
   const [isRetroactive, setIsRetroactive] = useState(false);
 
+  // Phasen-Formate für reguläre Turniere
+  const [phaseGroupFormat, setPhaseGroupFormat] = useState("301_bo1");
+  const [phaseQFFormat, setPhaseQFFormat] = useState("301_bo3");
+  const [phaseSFFormat, setPhaseSFFormat] = useState("501_bo3");
+  const [phaseFinalFormat, setPhaseFinalFormat] = useState("501_bo3");
+
   // Grand Final Config (nur wenn isFinalTournament)
   const [grandFinalQualifiers, setGrandFinalQualifiers] = useState(8);
   const [grandFinalQF, setGrandFinalQF] = useState("501_bo3");
@@ -81,6 +87,9 @@ export default function TournamentsPage() {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+
+  // Ansicht
+  const [viewMode, setViewMode] = useState<"card" | "list">("card");
 
   useEffect(() => {
     if (!isAuthReady || !user) return;
@@ -158,6 +167,10 @@ export default function TournamentsPage() {
     setTournamentNumber("");
     setIsFinalTournament(false);
     setIsRetroactive(false);
+    setPhaseGroupFormat("301_bo1");
+    setPhaseQFFormat("301_bo3");
+    setPhaseSFFormat("501_bo3");
+    setPhaseFinalFormat("501_bo3");
     setGrandFinalQualifiers(8);
     setGrandFinalQF("501_bo3");
     setGrandFinalSF("501_bo3");
@@ -238,6 +251,14 @@ export default function TournamentsPage() {
         data.tournamentNumber = Number(tournamentNumber);
       }
       if (isRetroactive) data.isRetroactive = true;
+      if (!isFinalTournament) {
+        data.phaseFormats = {
+          group: phaseGroupFormat,
+          quarter: phaseQFFormat,
+          semi: phaseSFFormat,
+          final: phaseFinalFormat,
+        };
+      }
 
       const docRef = await addDoc(collection(db, "tournaments"), data);
       resetForm();
@@ -260,234 +281,312 @@ export default function TournamentsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Turniere</h1>
             <p className="text-zinc-500">Verwalte deine Dart-Events und verfolge Ergebnisse.</p>
           </div>
-          <div className="flex items-center gap-4 w-full sm:w-auto">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* Ansicht-Toggle */}
+            <div className="flex border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden shrink-0">
+              <button
+                onClick={() => setViewMode("card")}
+                className={`p-2 transition-colors ${viewMode === "card" ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-white dark:bg-zinc-900 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"}`}
+                title="Karten-Ansicht"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 transition-colors border-l border-zinc-200 dark:border-zinc-700 ${viewMode === "list" ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-white dark:bg-zinc-900 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"}`}
+                title="Listen-Ansicht"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
             <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
               <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
                 Neues Turnier
               </Button>
-              <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle>Neues Turnier erstellen</DialogTitle>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="space-y-4 py-2">
 
                   {/* Template laden */}
                   {isAdmin && templates.length > 0 && (
-                    <div className="grid gap-2">
-                      <Label>Von Template laden</Label>
-                      <div className="flex gap-2">
-                        <select
-                          value={selectedTemplateId}
-                          onChange={(e) => applyTemplate(e.target.value)}
-                          className="flex-1 border border-zinc-200 rounded-md px-3 py-2 text-sm bg-white dark:bg-zinc-900 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                        >
-                          <option value="">— Kein Template —</option>
-                          {templates.map((t) => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                        </select>
-                        {isSuperAdmin && selectedTemplateId && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-500 hover:text-red-700 shrink-0"
-                            onClick={() => { deleteTemplate(selectedTemplateId); setSelectedTemplateId(""); }}
-                            title="Template löschen"
+                    <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+                      <div className="bg-zinc-50 dark:bg-zinc-900 px-3 py-2 border-b border-zinc-200 dark:border-zinc-700">
+                        <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Vorlage</p>
+                      </div>
+                      <div className="p-3">
+                        <div className="flex gap-2">
+                          <select
+                            value={selectedTemplateId}
+                            onChange={(e) => applyTemplate(e.target.value)}
+                            className="flex-1 border border-zinc-200 rounded-md px-3 py-2 text-sm bg-white dark:bg-zinc-900 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
+                            <option value="">— Kein Template —</option>
+                            {templates.map((t) => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
+                          {isSuperAdmin && selectedTemplateId && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-500 hover:text-red-700 shrink-0"
+                              onClick={() => { deleteTemplate(selectedTemplateId); setSelectedTemplateId(""); }}
+                              title="Template löschen"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="title">Turniername *</Label>
-                    <Input
-                      id="title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="z.B. Freitagsturnier April"
-                      maxLength={100}
-                      required
-                    />
-                    {title.trim().length > 80 && (
-                      <p className="text-xs text-zinc-400">{title.trim().length}/100 Zeichen</p>
-                    )}
-                  </div>
+                  {/* Basis */}
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+                    <div className="bg-zinc-50 dark:bg-zinc-900 px-3 py-2 border-b border-zinc-200 dark:border-zinc-700">
+                      <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Basis</p>
+                    </div>
+                    <div className="p-3 space-y-3">
+                      <div>
+                        <Label htmlFor="title" className="text-xs mb-1.5 block">Turniername *</Label>
+                        <Input
+                          id="title"
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          placeholder="z.B. Freitagsturnier April"
+                          maxLength={100}
+                          required
+                        />
+                        {title.trim().length > 80 && (
+                          <p className="text-xs text-zinc-400 mt-1">{title.trim().length}/100</p>
+                        )}
+                      </div>
 
-                  {seasons.length > 0 && (
-                    <div className="grid gap-2 pt-2 border-t">
-                      <Label>Season (optional)</Label>
-                      <select
-                        value={selectedSeasonId}
-                        onChange={(e) => setSelectedSeasonId(e.target.value)}
-                        className="border border-zinc-200 rounded-md px-3 py-2 text-sm bg-white dark:bg-zinc-900 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                      >
-                        <option value="">Keine Season</option>
-                        {seasons.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
-                      {selectedSeasonId && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              id="isFinal"
-                              checked={isFinalTournament}
-                              onChange={(e) => {
-                                setIsFinalTournament(e.target.checked);
-                                if (e.target.checked) setTournamentNumber("");
-                              }}
-                            />
-                            <Label htmlFor="isFinal" className="font-normal">
-                              Final-Turnier dieser Season
-                            </Label>
-                          </div>
-                          {isFinalTournament && (
-                            <div className="mt-3 space-y-3 pl-6 border-l-2 border-yellow-300 dark:border-yellow-600">
-                              <div>
-                                <Label className="text-xs text-zinc-500 font-normal mb-1.5 block">Qualifier-Anzahl</Label>
-                                <div className="flex gap-1.5">
-                                  {[4, 6, 8, 10].map((n) => (
-                                    <button
-                                      key={n}
-                                      type="button"
-                                      onClick={() => setGrandFinalQualifiers(n)}
-                                      className={`w-10 h-8 rounded-md text-sm font-bold transition-colors ${
-                                        grandFinalQualifiers === n
-                                          ? "bg-yellow-500 text-white"
-                                          : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                                      }`}
-                                    >
-                                      {n}
-                                    </button>
-                                  ))}
+                      {seasons.length > 0 && (
+                        <div>
+                          <Label className="text-xs mb-1.5 block">Season</Label>
+                          <select
+                            value={selectedSeasonId}
+                            onChange={(e) => setSelectedSeasonId(e.target.value)}
+                            className="w-full border border-zinc-200 rounded-md px-3 py-2 text-sm bg-white dark:bg-zinc-900 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500"
+                          >
+                            <option value="">Keine Season</option>
+                            {seasons.map((s) => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                          {selectedSeasonId && (
+                            <div className="mt-2 space-y-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  id="isFinal"
+                                  checked={isFinalTournament}
+                                  onChange={(e) => {
+                                    setIsFinalTournament(e.target.checked);
+                                    if (e.target.checked) setTournamentNumber("");
+                                  }}
+                                  className="rounded"
+                                />
+                                <span className="text-sm">Grand Final dieser Season</span>
+                              </label>
+                              {!isFinalTournament && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-zinc-500 whitespace-nowrap">Turnier Nr.</span>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={10}
+                                    value={tournamentNumber}
+                                    onChange={(e) =>
+                                      setTournamentNumber(e.target.value === "" ? "" : Number(e.target.value))
+                                    }
+                                    placeholder="1–10"
+                                    className="w-20 h-8 text-sm"
+                                  />
                                 </div>
-                              </div>
-                              <div className="grid gap-1.5">
-                                <Label className="text-xs text-zinc-500 font-normal">KO-Formate</Label>
-                                {[
-                                  { label: "Viertelfinale", value: grandFinalQF, set: setGrandFinalQF },
-                                  { label: "Halbfinale",    value: grandFinalSF, set: setGrandFinalSF },
-                                  { label: "Finale",        value: grandFinalF,  set: setGrandFinalF  },
-                                ].map(({ label, value, set }) => (
-                                  <div key={label} className="flex items-center gap-2">
-                                    <span className="text-xs text-zinc-500 w-24">{label}</span>
-                                    <select
-                                      value={value}
-                                      onChange={(e) => set(e.target.value)}
-                                      className="flex-1 border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1 text-xs bg-white dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                                    >
-                                      <option value="501_bo1">501 · Best of 1</option>
-                                      <option value="501_bo3">501 · Best of 3</option>
-                                      <option value="501_bo5">501 · Best of 5</option>
-                                      <option value="301_bo1">301 · Best of 1</option>
-                                      <option value="301_bo3">301 · Best of 3</option>
-                                    </select>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {!isFinalTournament && (
-                            <div className="flex items-center gap-2">
-                              <Label className="whitespace-nowrap font-normal">Turnier Nr.</Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={10}
-                                value={tournamentNumber}
-                                onChange={(e) =>
-                                  setTournamentNumber(e.target.value === "" ? "" : Number(e.target.value))
-                                }
-                                placeholder="1–10"
-                                className="w-24"
-                              />
+                              )}
                             </div>
                           )}
                         </div>
                       )}
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          id="isRetroactive"
+                          checked={isRetroactive}
+                          onChange={(e) => setIsRetroactive(e.target.checked)}
+                          className="rounded"
+                        />
+                        <span className="text-sm">Retroaktiv <span className="text-zinc-400 text-xs">(Ergebnisse manuell eintragen)</span></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Grand Final Config */}
+                  {isFinalTournament && (
+                    <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 overflow-hidden">
+                      <div className="bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 border-b border-yellow-200 dark:border-yellow-800">
+                        <p className="text-[11px] font-semibold text-yellow-700 dark:text-yellow-400 uppercase tracking-wider">Grand Final</p>
+                      </div>
+                      <div className="p-3 space-y-3">
+                        <div>
+                          <p className="text-xs text-zinc-500 mb-2">Qualifier-Anzahl</p>
+                          <div className="flex gap-1.5">
+                            {[4, 6, 8, 10].map((n) => (
+                              <button
+                                key={n}
+                                type="button"
+                                onClick={() => setGrandFinalQualifiers(n)}
+                                className={`w-11 h-9 rounded-lg text-sm font-bold transition-colors ${
+                                  grandFinalQualifiers === n
+                                    ? "bg-yellow-500 text-white shadow-sm"
+                                    : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
+                                }`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-zinc-500 mb-2">KO-Formate</p>
+                          <div className="space-y-1.5">
+                            {[
+                              { label: "Viertelfinale", value: grandFinalQF, set: setGrandFinalQF },
+                              { label: "Halbfinale",    value: grandFinalSF, set: setGrandFinalSF },
+                              { label: "Finale",        value: grandFinalF,  set: setGrandFinalF  },
+                            ].map(({ label, value, set }) => (
+                              <div key={label} className="flex items-center gap-2">
+                                <span className="text-xs text-zinc-500 w-24 shrink-0">{label}</span>
+                                <select
+                                  value={value}
+                                  onChange={(e) => set(e.target.value)}
+                                  className="flex-1 border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 text-xs bg-white dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                                >
+                                  <option value="501_bo1">501 · Best of 1</option>
+                                  <option value="501_bo3">501 · Best of 3</option>
+                                  <option value="501_bo5">501 · Best of 5</option>
+                                  <option value="301_bo1">301 · Best of 1</option>
+                                  <option value="301_bo3">301 · Best of 3</option>
+                                </select>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 
-                  <div className="grid gap-2 pt-2 border-t">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="isRetroactive"
-                        checked={isRetroactive}
-                        onChange={(e) => setIsRetroactive(e.target.checked)}
-                      />
-                      <Label htmlFor="isRetroactive" className="font-normal">
-                        Retroaktives Turnier{" "}
-                        <span className="text-zinc-400 text-xs">(Ergebnisse manuell eintragen)</span>
-                      </Label>
+                  {/* Format */}
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+                    <div className="bg-zinc-50 dark:bg-zinc-900 px-3 py-2 border-b border-zinc-200 dark:border-zinc-700">
+                      <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Format</p>
+                    </div>
+                    <div className="p-3 space-y-3">
+                      <div>
+                        <Label className="text-xs mb-1.5 block">Dartscheiben</Label>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setNumberOfBoards(n)}
+                              className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${
+                                numberOfBoards === n
+                                  ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-sm"
+                                  : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {!isFinalTournament && (
+                        <div>
+                          <Label className="text-xs mb-1.5 block">Phasen-Formate</Label>
+                          <div className="space-y-1.5">
+                            {[
+                              { label: "Gruppenphase", value: phaseGroupFormat, set: setPhaseGroupFormat },
+                              { label: "Viertelfinale", value: phaseQFFormat,    set: setPhaseQFFormat },
+                              { label: "Halbfinale",    value: phaseSFFormat,    set: setPhaseSFFormat },
+                              { label: "Finale",        value: phaseFinalFormat, set: setPhaseFinalFormat },
+                            ].map(({ label, value, set }) => (
+                              <div key={label} className="flex items-center gap-2">
+                                <span className="text-xs text-zinc-500 w-24 shrink-0">{label}</span>
+                                <select
+                                  value={value}
+                                  onChange={(e) => set(e.target.value)}
+                                  className="flex-1 border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1.5 text-xs bg-white dark:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                                >
+                                  <option value="301_bo1">301 · Best of 1</option>
+                                  <option value="301_bo3">301 · Best of 3</option>
+                                  <option value="301_bo5">301 · Best of 5</option>
+                                  <option value="501_bo1">501 · Best of 1</option>
+                                  <option value="501_bo3">501 · Best of 3</option>
+                                  <option value="501_bo5">501 · Best of 5</option>
+                                  <option value="701_bo1">701 · Best of 1</option>
+                                  <option value="701_bo3">701 · Best of 3</option>
+                                </select>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Dartscheiben */}
-                  <div className="grid gap-2 pt-2 border-t">
-                    <Label htmlFor="boards">Dartscheiben</Label>
-                    <select
-                      id="boards"
-                      value={numberOfBoards}
-                      onChange={(e) => setNumberOfBoards(Number(e.target.value))}
-                      className="border border-zinc-200 rounded-md px-3 py-2 text-sm bg-white dark:bg-zinc-900 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                    >
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                        <option key={n} value={n}>
-                          {n} Dartscheibe{n === 1 ? "" : "n"}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-zinc-400">
-                      Wie viele Dartscheiben stehen gleichzeitig zur Verfügung?
-                    </p>
-                  </div>
-
-                  <div className="grid gap-2 pt-2 border-t">
-                    <Label>Checkout-Regel</Label>
-                    <CheckoutBuilder
-                      value={checkoutConfig}
-                      onChange={setCheckoutConfig}
-                      showInRule={true}
-                    />
-                  </div>
-
-                  <div className="grid gap-2 pt-2 border-t">
-                    <Label>Draw-Regel</Label>
-                    <div className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        id="drawEnabled"
-                        checked={drawRule.enabled}
-                        onChange={(e) => setDrawRule({ enabled: e.target.checked })}
-                        className="mt-0.5"
-                      />
+                  {/* Spielregeln */}
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+                    <div className="bg-zinc-50 dark:bg-zinc-900 px-3 py-2 border-b border-zinc-200 dark:border-zinc-700">
+                      <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Spielregeln</p>
+                    </div>
+                    <div className="p-3 space-y-4">
                       <div>
-                        <Label htmlFor="drawEnabled" className="font-normal">
-                          Unentschieden erlaubt (Best of 1)
-                        </Label>
-                        <p className="text-xs text-zinc-400 mt-0.5">
-                          Spieler 2 darf nach dem Checkout von Spieler 1 noch seinen Wurf vollenden.
-                        </p>
+                        <Label className="text-xs mb-2 block">Checkout-Regel</Label>
+                        <CheckoutBuilder
+                          value={checkoutConfig}
+                          onChange={setCheckoutConfig}
+                          showInRule={true}
+                        />
+                      </div>
+
+                      <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3">
+                        <label className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            id="drawEnabled"
+                            checked={drawRule.enabled}
+                            onChange={(e) => setDrawRule({ enabled: e.target.checked })}
+                            className="mt-0.5 rounded"
+                          />
+                          <div>
+                            <span className="text-sm">Unentschieden erlaubt</span>
+                            <p className="text-xs text-zinc-400 mt-0.5">
+                              Spieler 2 darf nach dem Checkout von Spieler 1 noch seinen Wurf vollenden.
+                            </p>
+                          </div>
+                        </label>
+                      </div>
+
+                      <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3">
+                        <Label className="text-xs mb-2 block">Anwurf</Label>
+                        <MatchStartSelector
+                          value={matchStartConfig}
+                          onChange={setMatchStartConfig}
+                        />
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid gap-2 pt-2 border-t">
-                    <Label>Anwurf-Konfiguration</Label>
-                    <MatchStartSelector
-                      value={matchStartConfig}
-                      onChange={setMatchStartConfig}
-                    />
-                  </div>
-
                   {/* Als Template speichern */}
                   {isAdmin && (
-                    <div className="pt-2 border-t">
+                    <div>
                       {showSaveTemplate ? (
                         <div className="flex gap-2">
                           <Input
@@ -516,7 +615,7 @@ export default function TournamentsPage() {
                           onClick={() => setShowSaveTemplate(true)}
                           className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
                         >
-                          + Als Template speichern
+                          + Als Vorlage speichern
                         </button>
                       )}
                     </div>
@@ -535,51 +634,94 @@ export default function TournamentsPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {tournaments.map((t) => {
-            const season = seasons.find((s) => s.id === t.seasonId);
-            return (
-              <Card
-                key={t.id}
-                className="cursor-pointer hover:border-zinc-400 transition-colors"
-                onClick={() => router.push(`/tournament/${t.id}`)}
-              >
-                <CardHeader>
-                  <CardTitle className="text-lg">{t.title}</CardTitle>
-                  <CardDescription>
-                    {new Date(t.createdAt).toLocaleDateString("de-DE")}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-zinc-100 text-zinc-900">
-                    {t.status.toUpperCase()}
+        {/* KARTEN-ANSICHT */}
+        {viewMode === "card" && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {tournaments.map((t) => {
+              const season = seasons.find((s) => s.id === t.seasonId);
+              return (
+                <Card
+                  key={t.id}
+                  className="cursor-pointer hover:border-zinc-400 transition-colors"
+                  onClick={() => router.push(`/tournament/${t.id}`)}
+                >
+                  <CardHeader>
+                    <CardTitle className="text-lg">{t.title}</CardTitle>
+                    <CardDescription>
+                      {new Date(t.createdAt).toLocaleDateString("de-DE")}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-wrap items-center gap-2">
+                    <div className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent ${t.status === "completed" ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400" : t.status === "draft" ? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400"}`}>
+                      {t.status === "completed" ? "Abgeschlossen" : t.status === "draft" ? "Entwurf" : t.status === "groups" ? "Gruppenphase" : t.status === "tiebreaks" ? "Tiebreaks" : t.status === "bracket" ? "Endrunde" : t.status.toUpperCase()}
+                    </div>
+                    {season && (
+                      <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400">
+                        {season.name}
+                        {t.isFinalTournament ? " · Final" : t.tournamentNumber ? ` · #${t.tournamentNumber}` : ""}
+                      </div>
+                    )}
+                    {t.isRetroactive && (
+                      <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">
+                        Retroaktiv
+                      </div>
+                    )}
+                    {t.numberOfBoards > 1 && (
+                      <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                        🎯 {t.numberOfBoards} Scheiben
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {tournaments.length === 0 && (
+              <div className="col-span-full py-12 text-center border-2 border-dashed rounded-lg border-zinc-200 dark:border-zinc-700">
+                <p className="text-zinc-500">Noch keine Turniere. Erstelle dein erstes Turnier.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* LISTEN-ANSICHT */}
+        {viewMode === "list" && (
+          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800">
+            {tournaments.map((t) => {
+              const season = seasons.find((s) => s.id === t.seasonId);
+              const statusLabel = t.status === "completed" ? "Abgeschlossen" : t.status === "draft" ? "Entwurf" : t.status === "groups" ? "Gruppenphase" : t.status === "tiebreaks" ? "Tiebreaks" : t.status === "bracket" ? "Endrunde" : t.status;
+              const statusColor = t.status === "completed" ? "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30" : t.status === "draft" ? "text-zinc-500 bg-zinc-100 dark:bg-zinc-800" : "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30";
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                  onClick={() => router.push(`/tournament/${t.id}`)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate text-zinc-900 dark:text-zinc-100">{t.title}</div>
+                    <div className="text-xs text-zinc-400 mt-0.5">
+                      {new Date(t.createdAt).toLocaleDateString("de-DE")}
+                      {season && <span className="ml-2 text-blue-500">{season.name}{t.isFinalTournament ? " · Final" : t.tournamentNumber ? ` · #${t.tournamentNumber}` : ""}</span>}
+                    </div>
                   </div>
-                  {season && (
-                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-blue-100 text-blue-800">
-                      {season.name}
-                      {t.isFinalTournament ? " · Final" : t.tournamentNumber ? ` · #${t.tournamentNumber}` : ""}
-                    </div>
-                  )}
-                  {t.isRetroactive && (
-                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-orange-100 text-orange-700">
-                      Retroaktiv
-                    </div>
-                  )}
-                  {t.numberOfBoards > 1 && (
-                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-zinc-100 text-zinc-600">
-                      🎯 {t.numberOfBoards} Scheiben
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-          {tournaments.length === 0 && (
-            <div className="col-span-full py-12 text-center border-2 border-dashed rounded-lg border-zinc-200">
-              <p className="text-zinc-500">Noch keine Turniere. Erstelle dein erstes Turnier.</p>
-            </div>
-          )}
-        </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {t.isRetroactive && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">Retro</span>
+                    )}
+                    {t.numberOfBoards > 1 && (
+                      <span className="text-[10px] text-zinc-400">🎯{t.numberOfBoards}</span>
+                    )}
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>{statusLabel}</span>
+                  </div>
+                </div>
+              );
+            })}
+            {tournaments.length === 0 && (
+              <div className="py-12 text-center">
+                <p className="text-zinc-500">Noch keine Turniere. Erstelle dein erstes Turnier.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

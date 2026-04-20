@@ -98,6 +98,11 @@ export default function StandingsPage() {
           (t) => t.status === "completed" && !t.isFinalTournament,
         );
 
+        // Default scoring rules (can be overridden by Liga)
+        const defaultScoring: Record<string, number> = {
+          "1": 7, "2": 6, "3": 4, "4": 3, "5": 2, participation: 1, stayedUntilFinal: 1,
+        };
+
         const playerMap = new Map<string, SeasonStandingEntry>();
 
         for (const tourn of completed) {
@@ -105,23 +110,49 @@ export default function StandingsPage() {
             const playersSnap = await getDocs(
               collection(db, "tournaments", tourn.id, "players"),
             );
-            playersSnap.docs.forEach((pd) => {
-              const pData = pd.data() as any;
-              const existing = playerMap.get(pd.id) ?? {
-                playerId: pd.id,
-                name: pData.name,
+            const matchesSnap = await getDocs(
+              collection(db, "tournaments", tourn.id, "matches"),
+            );
+            const tPlayers = playersSnap.docs.map((pd) => ({ id: pd.id, ...(pd.data() as any) }));
+            const tMatches = matchesSnap.docs.map((md) => ({ id: md.id, ...(md.data() as any) }));
+
+            // Compute placement ranking (same logic as tournament results)
+            const finalMatch = tMatches.find((m: any) => m.phase === "final");
+            const semiMatches = tMatches.filter((m: any) => m.phase === "semi");
+            const quarterMatches = tMatches.filter((m: any) => m.phase === "quarter");
+
+            const rankedPlayers = tPlayers.map((p: any) => {
+              let rankScore = 0;
+              if (finalMatch?.winnerId === p.id) rankScore = 10000;
+              else if (finalMatch && (finalMatch.playerAId === p.id || finalMatch.playerBId === p.id)) rankScore = 9000;
+              else if (semiMatches.some((m: any) => m.playerAId === p.id || m.playerBId === p.id)) rankScore = 8000;
+              else if (quarterMatches.some((m: any) => m.playerAId === p.id || m.playerBId === p.id)) rankScore = 7000;
+              rankScore += (p.points || 0) * 100 + (p.wins || 0) * 10 - (p.losses || 0);
+              return { ...p, rankScore };
+            }).sort((a: any, b: any) => b.rankScore - a.rankScore);
+
+            rankedPlayers.forEach((p: any, index: number) => {
+              const existing = playerMap.get(p.id) ?? {
+                playerId: p.id,
+                name: p.name,
                 totalPoints: 0,
                 tournamentsPlayed: 0,
                 wins: 0,
                 draws: 0,
                 losses: 0,
               };
-              existing.totalPoints += pData.points ?? 0;
+
+              // Placement-based scoring
+              const placement = String(index + 1);
+              const placementPoints = defaultScoring[placement] ?? 0;
+              const participationPoints = defaultScoring.participation ?? 0;
+              const finalBonus = (p.stayedUntilFinal || index < 2) ? (defaultScoring.stayedUntilFinal ?? 0) : 0;
+              existing.totalPoints += placementPoints + participationPoints + finalBonus;
               existing.tournamentsPlayed += 1;
-              existing.wins += pData.wins ?? 0;
-              existing.draws += pData.draws ?? 0;
-              existing.losses += pData.losses ?? 0;
-              playerMap.set(pd.id, existing);
+              existing.wins += p.wins ?? 0;
+              existing.draws += p.draws ?? 0;
+              existing.losses += p.losses ?? 0;
+              playerMap.set(p.id, existing);
             });
           } catch (_) {
             // einzelnes Turnier überspringen wenn kein Zugriff

@@ -71,6 +71,8 @@ export default function TournamentPage() {
   const [editMatchStart, setEditMatchStart] = useState<MatchStartConfig>(DEFAULT_MATCH_START);
   const [editBoards, setEditBoards] = useState(1);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [matchViewMode, setMatchViewMode] = useState<"card" | "list">("card");
+  const [activeTab, setActiveTab] = useState("participants");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -180,6 +182,53 @@ export default function TournamentPage() {
     };
   }, [id, user, isAuthReady, router]);
 
+  // Auto-Tab-Wechsel wenn Phase wechselt
+  useEffect(() => {
+    if (!tournament) return;
+    const status = tournament.status;
+    if (status === "groups") {
+      setActiveTab("groups");
+    } else if (status === "tiebreaks") {
+      setActiveTab("tiebreaks");
+    } else if (status === "bracket") {
+      setActiveTab("bracket");
+    } else if (status === "completed") {
+      setActiveTab("results");
+    }
+  }, [tournament?.status]);
+
+  // Format-Label (z.B. "501 · Bo3")
+  const fmtLabel = (fmt: string | undefined) => {
+    if (!fmt) return "";
+    const m = fmt.match(/^(301|501|701)_bo(\d+)$/);
+    return m ? `${m[1]} · Bo${m[2]}` : fmt;
+  };
+
+  // Heading-Font Style für Nickname-Anzeige
+  const headingStyle: React.CSSProperties = {
+    fontFamily: "var(--font-heading, sans-serif)",
+    fontWeight: "var(--heading-weight, 700)" as any,
+    textTransform: "var(--heading-transform, none)" as any,
+    fontStyle: "var(--heading-style, normal)",
+  };
+
+  // Nickname aus globalPlayers holen (Tournament-Player-ID = Global-Player-ID)
+  const getPlayerNickname = (playerId: string) => {
+    const gp = globalPlayers.find((g) => g.id === playerId);
+    return gp?.nickname || null;
+  };
+
+  // Anzeigename: Nickname wenn vorhanden, sonst Name
+  const getDisplayName = (playerId: string, fallbackName?: string) => {
+    return getPlayerNickname(playerId) || fallbackName || playerId;
+  };
+
+  // Avatar-URL aus globalPlayers
+  const getPlayerAvatar = (playerId: string) => {
+    const gp = globalPlayers.find((g) => g.id === playerId);
+    return gp?.avatar || null;
+  };
+
   const addPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlayerName.trim() || !user) return;
@@ -232,7 +281,7 @@ export default function TournamentPage() {
 
   const generateBracket = async () => {
     if (players.length < 4) {
-      alert("Need at least 4 players for a bracket.");
+      alert("Mindestens 4 Spieler für die Endrunde erforderlich.");
       return;
     }
 
@@ -242,7 +291,7 @@ export default function TournamentPage() {
       groupMatches.some((m) => m.status !== "completed")
     ) {
       alert(
-        "All group matches must be completed before generating the bracket.",
+        "Alle Gruppenspiele müssen abgeschlossen sein, bevor die Endrunde generiert werden kann.",
       );
       return;
     }
@@ -253,7 +302,7 @@ export default function TournamentPage() {
         (tb) => tb.status !== "completed",
       );
       if (pendingTiebreaks.length > 0) {
-        alert("Please complete all tiebreaks first.");
+        alert("Bitte zuerst alle Tiebreaks abschließen.");
         return;
       }
     }
@@ -374,10 +423,11 @@ export default function TournamentPage() {
         const phase = isTop4 ? "semi" : "quarter";
 
         const gfc = tournament?.grandFinalConfig;
+        const pf = tournament?.phaseFormats;
         const startScore = (fmt: string) => fmt.startsWith("301") ? 301 : 501;
         const phaseFormat = isTop4
-          ? (gfc?.semiFormat ?? tournament?.format ?? "501_bo3")
-          : (gfc?.quarterFormat ?? tournament?.format ?? "501_bo3");
+          ? (gfc?.semiFormat ?? pf?.semi ?? tournament?.format ?? "501_bo3")
+          : (gfc?.quarterFormat ?? pf?.quarter ?? tournament?.format ?? "501_bo3");
 
         for (const [pA, pB] of matchups) {
           await addDoc(collection(db, "tournaments", id, "matches"), {
@@ -411,7 +461,7 @@ export default function TournamentPage() {
   const generateNextRound = async (currentPhase: string) => {
     const currentMatches = matches.filter((m) => m.phase === currentPhase);
     if (currentMatches.some((m) => m.status !== "completed")) {
-      alert("Not all matches in this round are completed.");
+      alert("Nicht alle Spiele dieser Runde sind abgeschlossen.");
       return;
     }
 
@@ -445,7 +495,8 @@ export default function TournamentPage() {
         ];
 
         const sfGfc = tournament?.grandFinalConfig;
-        const sfFmt = sfGfc?.semiFormat ?? tournament?.format ?? "501_bo3";
+        const sfPf = tournament?.phaseFormats;
+        const sfFmt = sfGfc?.semiFormat ?? sfPf?.semi ?? tournament?.format ?? "501_bo3";
         const sfStart = sfFmt.startsWith("301") ? 301 : 501;
 
         for (const [pA, pB] of sfMatchups) {
@@ -482,7 +533,8 @@ export default function TournamentPage() {
             : { id: m2.playerBId, name: m2.playerBName };
 
         const finGfc = tournament?.grandFinalConfig;
-        const finFmt = finGfc?.finalFormat ?? tournament?.format ?? "501_bo5";
+        const finPf = tournament?.phaseFormats;
+        const finFmt = finGfc?.finalFormat ?? finPf?.final ?? tournament?.format ?? "501_bo5";
         const finStart = finFmt.startsWith("301") ? 301 : 501;
 
         await addDoc(collection(db, "tournaments", id, "matches"), {
@@ -509,7 +561,7 @@ export default function TournamentPage() {
   };
   const startDraw = async () => {
     if (players.length < 4) {
-      alert("Need at least 4 players to start.");
+      alert("Mindestens 4 Spieler für den Start erforderlich.");
       return;
     }
 
@@ -532,6 +584,8 @@ export default function TournamentPage() {
       }
 
       // Generate Round Robin matches for a group
+      const grpFmt = tournament?.phaseFormats?.group ?? "301_bo1";
+      const grpStart = grpFmt.startsWith("501") ? 501 : grpFmt.startsWith("701") ? 701 : 301;
       const generateMatches = async (groupPlayers: any[]) => {
         for (let i = 0; i < groupPlayers.length; i++) {
           for (let j = i + 1; j < groupPlayers.length; j++) {
@@ -546,11 +600,11 @@ export default function TournamentPage() {
               currentLeg: 1,
               playerAStartsLeg: true,
               currentTurnId: "",
-              playerARest: 301,
-              playerBRest: 301,
+              playerARest: grpStart,
+              playerBRest: grpStart,
               answerThrowActive: false,
               status: "pending",
-              format: "301_bo1",
+              format: grpFmt,
             });
           }
         }
@@ -864,7 +918,7 @@ export default function TournamentPage() {
                 {tournament.title}
               </h1>
               <div className="flex items-center gap-2 mt-2">
-                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 text-zinc-900">
+                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200">
                   CASUAL TIEBREAK
                 </span>
               </div>
@@ -875,19 +929,20 @@ export default function TournamentPage() {
                 onClick={() => setIsDeleteDialogOpen(true)}
                 className="w-full sm:w-auto"
               >
-                <Trash2 className="w-4 h-4 mr-2" /> Delete
+                <Trash2 className="w-4 h-4 mr-2" /> Löschen
               </Button>
             )}
           </div>
 
-          <div className="space-y-6 mt-8">
+          <div className={`mt-8 ${(tournament.numberOfBoards ?? 1) > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "flex gap-4 overflow-x-auto pb-2"}`}>
             {tiebreaks.map((tb) => (
-              <TiebreakManager
-                key={tb.id}
-                tournamentId={id}
-                tiebreak={tb}
-                isAdmin={isAdmin}
-              />
+              <div key={tb.id} className={(tournament.numberOfBoards ?? 1) === 1 ? "min-w-[340px] flex-shrink-0" : undefined}>
+                <TiebreakManager
+                  tournamentId={id}
+                  tiebreak={tb}
+                  isAdmin={isAdmin}
+                />
+              </div>
             ))}
           </div>
 
@@ -907,10 +962,10 @@ export default function TournamentPage() {
                   variant="outline"
                   onClick={() => setIsDeleteDialogOpen(false)}
                 >
-                  Cancel
+                  Abbrechen
                 </Button>
                 <Button variant="destructive" onClick={deleteTournament}>
-                  Delete
+                  Löschen
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -937,7 +992,7 @@ export default function TournamentPage() {
               {tournament.title}
             </h1>
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 text-zinc-900">
+              <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200">
                 {tournament.status.toUpperCase()}
               </span>
               {tournament.isRetroactive && (
@@ -947,7 +1002,7 @@ export default function TournamentPage() {
               )}
               {tournament.isFinalTournament && (
                 <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-yellow-100 text-yellow-800">
-                  Final
+                  Finale
                 </span>
               )}
               {tournament.tournamentNumber && !tournament.isFinalTournament && (
@@ -959,7 +1014,7 @@ export default function TournamentPage() {
                 <Users className="h-4 w-4" /> {players.length} Spieler
               </span>
               {(tournament.numberOfBoards ?? 1) > 1 && (
-                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 text-zinc-600">
+                <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
                   🎯 {tournament.numberOfBoards} Scheiben
                 </span>
               )}
@@ -980,13 +1035,13 @@ export default function TournamentPage() {
                 onClick={() => setIsDeleteDialogOpen(true)}
                 className="flex-1 sm:flex-none"
               >
-                <Trash2 className="w-4 h-4 mr-2" /> Delete Tournament
+                <Trash2 className="w-4 h-4 mr-2" /> Turnier löschen
               </Button>
             </div>
           )}
         </div>
 
-        <Tabs defaultValue="participants" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="relative mb-0 h-[45px]">
             <TabsList 
               ref={scrollRef}
@@ -1011,7 +1066,7 @@ export default function TournamentPage() {
                   "shadow-sm after:hidden"
                 )}
               >
-                Participants
+                Teilnehmer
               </TabsTrigger>
               <TabsTrigger
                 value="groups"
@@ -1025,7 +1080,7 @@ export default function TournamentPage() {
                   "shadow-sm after:hidden"
                 )}
               >
-                Groups
+                Gruppen
               </TabsTrigger>
               <TabsTrigger
                 value="matches"
@@ -1039,7 +1094,7 @@ export default function TournamentPage() {
                   "shadow-sm after:hidden"
                 )}
               >
-                Matches
+                Spiele
               </TabsTrigger>
               <TabsTrigger
                 value="tiebreaks"
@@ -1069,7 +1124,7 @@ export default function TournamentPage() {
                   "shadow-sm after:hidden"
                 )}
               >
-                Finals
+                Endrunde
               </TabsTrigger>
               <TabsTrigger
                 value="results"
@@ -1083,7 +1138,7 @@ export default function TournamentPage() {
                   "shadow-sm after:hidden"
                 )}
               >
-                Results
+                Ergebnisse
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1092,12 +1147,12 @@ export default function TournamentPage() {
             <div className="grid md:grid-cols-3 gap-6">
               <Card className="md:col-span-1 h-fit">
                 <CardHeader>
-                  <CardTitle>Add Player</CardTitle>
+                  <CardTitle>Spieler hinzufügen</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={addPlayer} className="space-y-4">
                     <Input
-                      placeholder="Player name"
+                      placeholder="Spielername"
                       value={newPlayerName}
                       onChange={(e) => setNewPlayerName(e.target.value)}
                       disabled={tournament.status !== "draft"}
@@ -1115,7 +1170,7 @@ export default function TournamentPage() {
                         tournament.status !== "draft" || !newPlayerName.trim()
                       }
                     >
-                      Add Player
+                      Spieler hinzufügen
                     </Button>
                   </form>
                 </CardContent>
@@ -1159,10 +1214,15 @@ export default function TournamentPage() {
                       >
                         <div className="flex items-center gap-3">
                           <span className="text-zinc-400 w-6">{i + 1}.</span>
-                          <span className="font-medium">{p.name}</span>
+                          <span className="font-medium" style={getPlayerNickname(p.id) ? headingStyle : undefined}>
+                            {getDisplayName(p.id, p.name)}
+                          </span>
+                          {getPlayerNickname(p.id) && (
+                            <span className="text-xs text-zinc-400">{p.name}</span>
+                          )}
                           {p.groupId && (
-                            <span className="text-xs bg-zinc-100 px-2 py-1 rounded">
-                              Group {p.groupId}
+                            <span className="text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">
+                              Gruppe {p.groupId}
                             </span>
                           )}
                         </div>
@@ -1171,7 +1231,7 @@ export default function TournamentPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => removePlayer(p.id)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -1180,7 +1240,7 @@ export default function TournamentPage() {
                     ))}
                     {players.length === 0 && (
                       <p className="text-center text-zinc-500 py-8">
-                        No players added yet.
+                        Noch keine Spieler hinzugefügt.
                       </p>
                     )}
                   </div>
@@ -1190,12 +1250,28 @@ export default function TournamentPage() {
           </TabsContent>
 
           <TabsContent value="groups">
-            <div className="flex justify-end mb-4">
-              {tournament.status === "groups" && (
-                <Button onClick={generateBracket} disabled={players.length < 4}>
-                  Generate Bracket {players.length >= 8 ? "(Top 8)" : "(Top 4)"}
-                </Button>
+            <div className="flex items-center justify-between mb-4">
+              {tournament.phaseFormats?.group && (
+                <span className="text-xs text-zinc-400">Gruppenformat: <strong>{fmtLabel(tournament.phaseFormats.group)}</strong></span>
               )}
+              <div className="flex-1" />
+              {tournament.status === "groups" && (() => {
+                const groupMatches = matches.filter((m) => m.phase === "group");
+                const allCompleted = groupMatches.length > 0 && groupMatches.every((m) => m.status === "completed");
+                const canGenerate = players.length >= 4 && allCompleted;
+                return (
+                  <div className="flex items-center gap-3">
+                    {!canGenerate && players.length >= 4 && (
+                      <span className="text-xs text-zinc-400">
+                        {groupMatches.length === 0 ? "Noch keine Gruppenspiele" : `${groupMatches.filter((m) => m.status !== "completed").length} Spiel(e) offen`}
+                      </span>
+                    )}
+                    <Button onClick={generateBracket} disabled={!canGenerate}>
+                      Endrunde generieren {players.length >= 8 ? "(Top 8)" : "(Top 4)"}
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
             <div className="grid md:grid-cols-2 gap-6">
               {["A", "B"].map((groupId) => {
@@ -1211,26 +1287,31 @@ export default function TournamentPage() {
                 return (
                   <Card key={groupId}>
                     <CardHeader>
-                      <CardTitle>Group {groupId}</CardTitle>
+                      <CardTitle>Gruppe {groupId}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                          <thead className="text-xs text-zinc-500 uppercase bg-zinc-50">
+                          <thead className="text-xs text-zinc-500 uppercase bg-zinc-50 dark:bg-zinc-800/50">
                             <tr>
-                              <th className="px-4 py-2">Player</th>
-                              <th className="px-4 py-2 text-center">P</th>
-                              <th className="px-4 py-2 text-center">W</th>
-                              <th className="px-4 py-2 text-center">D</th>
-                              <th className="px-4 py-2 text-center">L</th>
-                              <th className="px-4 py-2 text-center">Pts</th>
+                              <th className="px-4 py-2">Spieler</th>
+                              <th className="px-4 py-2 text-center">SP</th>
+                              <th className="px-4 py-2 text-center">S</th>
+                              <th className="px-4 py-2 text-center">U</th>
+                              <th className="px-4 py-2 text-center">N</th>
+                              <th className="px-4 py-2 text-center">Pkt</th>
                             </tr>
                           </thead>
                           <tbody>
                             {groupPlayers.map((p, i) => (
                               <tr key={p.id} className="border-b">
                                 <td className="px-4 py-2 font-medium">
-                                  {i + 1}. {p.name}
+                                  <span style={getPlayerNickname(p.id) ? headingStyle : undefined}>
+                                    {i + 1}. {getDisplayName(p.id, p.name)}
+                                  </span>
+                                  {getPlayerNickname(p.id) && (
+                                    <div className="text-xs text-zinc-400 font-normal">{p.name}</div>
+                                  )}
                                 </td>
                                 <td className="px-4 py-2 text-center">
                                   {p.matchesPlayed}
@@ -1262,20 +1343,23 @@ export default function TournamentPage() {
           <TabsContent value="tiebreaks">
             <div className="space-y-6">
               {tiebreaks.length === 0 ? (
-                <div className="py-12 text-center border-2 border-dashed rounded-lg border-zinc-200">
+                <div className="py-12 text-center border-2 border-dashed rounded-lg border-zinc-200 dark:border-zinc-700">
                   <p className="text-zinc-500">
-                    No tiebreaks needed or generated yet.
+                    Keine Tiebreaks nötig oder generiert.
                   </p>
                 </div>
               ) : (
-                tiebreaks.map((tb) => (
-                  <TiebreakManager
-                    key={tb.id}
-                    tournamentId={id}
-                    tiebreak={tb}
-                    isAdmin={isAdmin}
-                  />
-                ))
+                <div className={(tournament.numberOfBoards ?? 1) > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "flex gap-4 overflow-x-auto pb-2"}>
+                  {tiebreaks.map((tb) => (
+                    <div key={tb.id} className={(tournament.numberOfBoards ?? 1) === 1 ? "min-w-[340px] flex-shrink-0" : undefined}>
+                      <TiebreakManager
+                        tournamentId={id}
+                        tiebreak={tb}
+                        isAdmin={isAdmin}
+                      />
+                    </div>
+                  ))}
+                </div>
               )}
               {tournament.status === "tiebreaks" &&
                 tiebreaks.every((tb) => tb.status === "completed") && (
@@ -1284,7 +1368,7 @@ export default function TournamentPage() {
                       onClick={generateBracket}
                       className="bg-green-600 hover:bg-green-700"
                     >
-                      Continue to Bracket
+                      Weiter zur Endrunde
                     </Button>
                   </div>
                 )}
@@ -1292,201 +1376,262 @@ export default function TournamentPage() {
           </TabsContent>
 
           <TabsContent value="matches">
-            <div className="grid gap-4">
-              {matches.map((m) => (
-                <Card
-                  key={m.id}
-                  className={`cursor-pointer hover:border-zinc-400 transition-colors ${
-                    m.status === "completed"
-                      ? "bg-zinc-100 opacity-75"
-                      : m.status === "in_progress"
-                        ? "bg-green-50 border-green-200"
-                        : "bg-white dark:bg-zinc-900"
-                  }`}
-                  onClick={() => router.push(`/tournament/${id}/match/${m.id}`)}
-                >
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex-1 flex items-center justify-end gap-4">
-                      <span
-                        className={`font-bold ${m.status === "completed" ? (m.isDraw ? "text-orange-500" : m.winnerId === m.playerAId ? "text-green-600" : "text-red-600") : ""}`}
-                      >
-                        {m.playerAName}
-                      </span>
-                      {m.status === "completed" ? (
-                        <span
-                          className={`text-2xl font-bold px-3 py-1 rounded ${m.isDraw ? "text-orange-500 bg-orange-50" : m.winnerId === m.playerAId ? "text-green-600 bg-green-50" : "text-red-600 bg-red-50"}`}
-                        >
-                          {m.isDraw
-                            ? "D"
-                            : m.winnerId === m.playerAId
-                              ? "W"
-                              : "L"}
-                        </span>
-                      ) : (
-                        <span className="text-2xl font-mono bg-white dark:bg-zinc-900 px-3 py-1 rounded border dark:border-zinc-800">
-                          {m.playerALegs}
-                        </span>
-                      )}
-                    </div>
-                    <div className="px-4 flex flex-col items-center">
-                      <span className="text-zinc-400 text-sm font-medium">
-                        {m.status === "completed"
-                          ? "FT"
-                          : m.status === "in_progress"
-                            ? "LIVE"
-                            : "VS"}
-                      </span>
-                      <span className="text-[10px] text-zinc-400 uppercase">
-                        {m.phase}
-                      </span>
-                    </div>
-                    <div className="flex-1 flex items-center justify-start gap-4">
-                      {m.status === "completed" ? (
-                        <span
-                          className={`text-2xl font-bold px-3 py-1 rounded ${m.isDraw ? "text-orange-500 bg-orange-50" : m.winnerId === m.playerBId ? "text-green-600 bg-green-50" : "text-red-600 bg-red-50"}`}
-                        >
-                          {m.isDraw
-                            ? "D"
-                            : m.winnerId === m.playerBId
-                              ? "W"
-                              : "L"}
-                        </span>
-                      ) : (
-                        <span className="text-2xl font-mono bg-white dark:bg-zinc-900 px-3 py-1 rounded border dark:border-zinc-800">
-                          {m.playerBLegs}
-                        </span>
-                      )}
-                      <span
-                        className={`font-bold ${m.status === "completed" ? (m.isDraw ? "text-orange-500" : m.winnerId === m.playerBId ? "text-green-600" : "text-red-600") : ""}`}
-                      >
-                        {m.playerBName}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {matches.length === 0 && (
-                <div className="py-12 text-center border-2 border-dashed rounded-lg border-zinc-200">
-                  <p className="text-zinc-500">No matches generated yet.</p>
+            {/* View Toggle */}
+            {matches.filter((m) => m.phase === "group").length > 0 && (
+              <div className="flex justify-end mb-3">
+                <div className="flex border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setMatchViewMode("card")}
+                    className={cn("px-3 py-1.5 text-xs font-medium transition-colors", matchViewMode === "card" ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-white dark:bg-zinc-900 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300")}
+                  >
+                    Karten
+                  </button>
+                  <button
+                    onClick={() => setMatchViewMode("list")}
+                    className={cn("px-3 py-1.5 text-xs font-medium transition-colors border-l border-zinc-200 dark:border-zinc-700", matchViewMode === "list" ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900" : "bg-white dark:bg-zinc-900 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300")}
+                  >
+                    Liste
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* CARD VIEW */}
+            {matchViewMode === "card" && (
+              <div className="grid gap-4">
+                {matches.filter((m) => m.phase === "group").map((m) => (
+                  <Card
+                    key={m.id}
+                    className={`cursor-pointer hover:border-zinc-400 transition-colors ${
+                      m.status === "completed"
+                        ? "bg-zinc-100 dark:bg-zinc-800/50 opacity-75"
+                        : m.status === "in_progress"
+                          ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+                          : "bg-white dark:bg-zinc-900"
+                    }`}
+                    onClick={() => router.push(`/tournament/${id}/match/${m.id}`)}
+                  >
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex-1 flex items-center justify-end gap-4">
+                        <span
+                          className={`font-bold ${m.status === "completed" ? (m.isDraw ? "text-orange-500" : m.winnerId === m.playerAId ? "text-green-600" : "text-red-600") : ""}`}
+                          style={getPlayerNickname(m.playerAId) ? headingStyle : undefined}
+                        >
+                          {getDisplayName(m.playerAId, m.playerAName)}
+                        </span>
+                        {m.status === "completed" ? (
+                          <span className={`text-2xl font-bold px-3 py-1 rounded ${m.isDraw ? "text-orange-500 bg-orange-50 dark:bg-orange-950/30" : m.winnerId === m.playerAId ? "text-green-600 bg-green-50 dark:bg-green-950/30" : "text-red-600 bg-red-50 dark:bg-red-950/30"}`}>
+                            {m.isDraw ? "D" : m.winnerId === m.playerAId ? "W" : "L"}
+                          </span>
+                        ) : (
+                          <span className="text-2xl font-mono bg-white dark:bg-zinc-900 px-3 py-1 rounded border dark:border-zinc-800">{m.playerALegs}</span>
+                        )}
+                      </div>
+                      <div className="px-4 flex flex-col items-center">
+                        <span className="text-zinc-400 text-sm font-medium">
+                          {m.status === "completed" ? "FT" : m.status === "in_progress" ? "LIVE" : "VS"}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 uppercase">{m.phase}</span>
+                      </div>
+                      <div className="flex-1 flex items-center justify-start gap-4">
+                        {m.status === "completed" ? (
+                          <span className={`text-2xl font-bold px-3 py-1 rounded ${m.isDraw ? "text-orange-500 bg-orange-50 dark:bg-orange-950/30" : m.winnerId === m.playerBId ? "text-green-600 bg-green-50 dark:bg-green-950/30" : "text-red-600 bg-red-50 dark:bg-red-950/30"}`}>
+                            {m.isDraw ? "D" : m.winnerId === m.playerBId ? "W" : "L"}
+                          </span>
+                        ) : (
+                          <span className="text-2xl font-mono bg-white dark:bg-zinc-900 px-3 py-1 rounded border dark:border-zinc-800">{m.playerBLegs}</span>
+                        )}
+                        <span
+                          className={`font-bold ${m.status === "completed" ? (m.isDraw ? "text-orange-500" : m.winnerId === m.playerBId ? "text-green-600" : "text-red-600") : ""}`}
+                          style={getPlayerNickname(m.playerBId) ? headingStyle : undefined}
+                        >
+                          {getDisplayName(m.playerBId, m.playerBName)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* LIST VIEW */}
+            {matchViewMode === "list" && (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border dark:border-zinc-800 divide-y dark:divide-zinc-800">
+                {matches.filter((m) => m.phase === "group").map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                    onClick={() => router.push(`/tournament/${id}/match/${m.id}`)}
+                  >
+                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${m.status === "completed" ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400" : m.status === "in_progress" ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"}`}>
+                      {m.phase}
+                    </span>
+                    <span className={`flex-1 text-sm truncate ${m.winnerId === m.playerAId ? "font-bold text-green-600 dark:text-green-400" : ""}`} style={getPlayerNickname(m.playerAId) ? headingStyle : undefined}>
+                      {getDisplayName(m.playerAId, m.playerAName)}
+                    </span>
+                    <span className="text-xs font-mono text-zinc-500 shrink-0">
+                      {m.status === "completed" ? `${m.playerALegs ?? 0}–${m.playerBLegs ?? 0}` : "vs"}
+                    </span>
+                    <span className={`flex-1 text-sm truncate text-right ${m.winnerId === m.playerBId ? "font-bold text-green-600 dark:text-green-400" : ""}`} style={getPlayerNickname(m.playerBId) ? headingStyle : undefined}>
+                      {getDisplayName(m.playerBId, m.playerBName)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {matches.filter((m) => m.phase === "group").length === 0 && (
+              <div className="py-12 text-center border-2 border-dashed rounded-lg border-zinc-200 dark:border-zinc-700">
+                <p className="text-zinc-500">Noch keine Gruppenspiele generiert.</p>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="bracket">
+            {/* Helper to render a bracket match card */}
+            {(() => {
+              const renderMatchCard = (m: any) => (
+                <Card
+                  key={m.id}
+                  className="cursor-pointer hover:border-zinc-400"
+                  onClick={() => router.push(`/tournament/${id}/match/${m.id}`)}
+                >
+                  <div className="p-3 text-sm flex items-center justify-between border-b dark:border-zinc-700">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {getPlayerAvatar(m.playerAId) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={getPlayerAvatar(m.playerAId)!} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-zinc-200 dark:bg-zinc-700 shrink-0" />
+                      )}
+                      <span className={`truncate ${m.winnerId === m.playerAId ? "font-bold" : ""}`} style={getPlayerNickname(m.playerAId) ? headingStyle : undefined}>
+                        {getDisplayName(m.playerAId, m.playerAName)}
+                      </span>
+                    </div>
+                    <span className="font-mono ml-2">{m.playerALegs}</span>
+                  </div>
+                  <div className="p-3 text-sm flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {getPlayerAvatar(m.playerBId) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={getPlayerAvatar(m.playerBId)!} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-zinc-200 dark:bg-zinc-700 shrink-0" />
+                      )}
+                      <span className={`truncate ${m.winnerId === m.playerBId ? "font-bold" : ""}`} style={getPlayerNickname(m.playerBId) ? headingStyle : undefined}>
+                        {getDisplayName(m.playerBId, m.playerBName)}
+                      </span>
+                    </div>
+                    <span className="font-mono ml-2">{m.playerBLegs}</span>
+                  </div>
+                </Card>
+              );
+
+              return (
             <div
               className={`grid gap-8 p-4 bg-white dark:bg-zinc-900 rounded-lg border dark:border-zinc-800 overflow-x-auto ${players.length >= 8 ? "md:grid-cols-3" : "md:grid-cols-2"}`}
             >
               {players.length >= 8 && (
-                <div className="space-y-4 min-w-[200px]">
+                <div className="min-w-[200px]">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-zinc-500 uppercase text-sm">
-                      Quarter Finals
-                    </h3>
+                    <div>
+                      <h3 className="font-bold text-zinc-500 uppercase text-sm">Viertelfinale</h3>
+                      {(tournament.phaseFormats?.quarter || matches.find((m) => m.phase === "quarter")?.format) && (
+                        <span className="text-[10px] text-zinc-400">{fmtLabel(tournament.phaseFormats?.quarter ?? matches.find((m) => m.phase === "quarter")?.format)}</span>
+                      )}
+                    </div>
                     {matches.filter((m) => m.phase === "quarter").length > 0 &&
-                      matches.filter((m) => m.phase === "semi").length ===
-                        0 && (
+                      matches.filter((m) => m.phase === "quarter").every((m) => m.status === "completed") &&
+                      matches.filter((m) => m.phase === "semi").length === 0 && (
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => generateNextRound("quarter")}
                         >
-                          Next Round
+                          <Settings2 className="w-3.5 h-3.5 mr-1.5" />
+                          Halbfinale starten
                         </Button>
                       )}
                   </div>
-                  {matches
-                    .filter((m) => m.phase === "quarter")
-                    .map((m) => (
-                      <Card
-                        key={m.id}
-                        className="cursor-pointer hover:border-zinc-400"
-                        onClick={() =>
-                          router.push(`/tournament/${id}/match/${m.id}`)
-                        }
-                      >
-                        <div className="p-3 text-sm flex justify-between border-b">
-                          <span
-                            className={
-                              m.winnerId === m.playerAId ? "font-bold" : ""
-                            }
-                          >
-                            {m.playerAName}
-                          </span>
-                          <span className="font-mono">{m.playerALegs}</span>
-                        </div>
-                        <div className="p-3 text-sm flex justify-between">
-                          <span
-                            className={
-                              m.winnerId === m.playerBId ? "font-bold" : ""
-                            }
-                          >
-                            {m.playerBName}
-                          </span>
-                          <span className="font-mono">{m.playerBLegs}</span>
-                        </div>
-                      </Card>
-                    ))}
+                  {/* QF matches grouped into pairs with bracket connectors */}
+                  {(() => {
+                    const qf = matches.filter((m) => m.phase === "quarter");
+                    const pairs: typeof qf[] = [];
+                    for (let i = 0; i < qf.length; i += 2) pairs.push(qf.slice(i, i + 2));
+                    return (
+                      <div className="space-y-4">
+                        {pairs.map((pair, pi) => (
+                          <div key={pi} className={`relative ${pi > 0 ? "mt-4" : ""}`}>
+                            <div className="space-y-4">
+                              {pair.map(renderMatchCard)}
+                            </div>
+                            {pair.length === 2 && (
+                              <div className="absolute -right-5 inset-y-0 w-5 pointer-events-none flex flex-col">
+                                <div className="flex-1 border-t-2 border-r-2 border-zinc-200 dark:border-zinc-700 rounded-tr-lg" />
+                                <div className="flex-1 border-b-2 border-r-2 border-zinc-200 dark:border-zinc-700 rounded-br-lg" />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
               <div
-                className={`space-y-4 min-w-[200px] ${players.length >= 8 ? "mt-12" : ""}`}
+                className={`min-w-[200px] ${players.length >= 8 ? "mt-12" : ""}`}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-zinc-500 uppercase text-sm">
-                    Semi Finals
-                  </h3>
+                  <div>
+                    <h3 className="font-bold text-zinc-500 uppercase text-sm">Halbfinale</h3>
+                    {(tournament.phaseFormats?.semi || matches.find((m) => m.phase === "semi")?.format) && (
+                      <span className="text-[10px] text-zinc-400">{fmtLabel(tournament.phaseFormats?.semi ?? matches.find((m) => m.phase === "semi")?.format)}</span>
+                    )}
+                  </div>
                   {matches.filter((m) => m.phase === "semi").length > 0 &&
+                    matches.filter((m) => m.phase === "semi").every((m) => m.status === "completed") &&
                     matches.filter((m) => m.phase === "final").length === 0 && (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => generateNextRound("semi")}
                       >
-                        Next Round
+                        <Settings2 className="w-3.5 h-3.5 mr-1.5" />
+                        Finale starten
                       </Button>
                     )}
                 </div>
-                {matches
-                  .filter((m) => m.phase === "semi")
-                  .map((m) => (
-                    <Card
-                      key={m.id}
-                      className="cursor-pointer hover:border-zinc-400"
-                      onClick={() =>
-                        router.push(`/tournament/${id}/match/${m.id}`)
-                      }
-                    >
-                      <div className="p-3 text-sm flex justify-between border-b">
-                        <span
-                          className={
-                            m.winnerId === m.playerAId ? "font-bold" : ""
-                          }
-                        >
-                          {m.playerAName}
-                        </span>
-                        <span className="font-mono">{m.playerALegs}</span>
+                {/* SF matches with bracket connector to final */}
+                {(() => {
+                  const sf = matches.filter((m) => m.phase === "semi");
+                  return (
+                    <div className={`relative ${sf.length === 2 ? "" : ""}`}>
+                      <div className="space-y-4">
+                        {sf.map(renderMatchCard)}
                       </div>
-                      <div className="p-3 text-sm flex justify-between">
-                        <span
-                          className={
-                            m.winnerId === m.playerBId ? "font-bold" : ""
-                          }
-                        >
-                          {m.playerBName}
-                        </span>
-                        <span className="font-mono">{m.playerBLegs}</span>
-                      </div>
-                    </Card>
-                  ))}
+                      {sf.length === 2 && (
+                        <div className="absolute -right-5 inset-y-0 w-5 pointer-events-none flex flex-col">
+                          <div className="flex-1 border-t-2 border-r-2 border-zinc-200 dark:border-zinc-700 rounded-tr-lg" />
+                          <div className="flex-1 border-b-2 border-r-2 border-zinc-200 dark:border-zinc-700 rounded-br-lg" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                {matches.filter((m) => m.phase === "semi").length === 0 && (
+                  <div className="text-xs text-zinc-400 italic">Folgt nach Viertelfinale</div>
+                )}
               </div>
               <div
                 className={`space-y-4 min-w-[200px] ${players.length >= 8 ? "mt-24" : "mt-12"}`}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-zinc-500 uppercase text-sm">
-                    Final
-                  </h3>
+                  <div>
+                    <h3 className="font-bold text-zinc-500 uppercase text-sm">Finale</h3>
+                    {(tournament.phaseFormats?.final || matches.find((m) => m.phase === "final")?.format) && (
+                      <span className="text-[10px] text-zinc-400">{fmtLabel(tournament.phaseFormats?.final ?? matches.find((m) => m.phase === "final")?.format)}</span>
+                    )}
+                  </div>
                   {matches.filter(
                     (m) => m.phase === "final" && m.status === "completed",
                   ).length > 0 &&
@@ -1508,149 +1653,162 @@ export default function TournamentPage() {
                           });
                         }}
                       >
-                        Complete Tournament
+                        Turnier abschließen
                       </Button>
                     )}
                 </div>
-                {matches
-                  .filter((m) => m.phase === "final")
-                  .map((m) => (
-                    <Card
-                      key={m.id}
-                      className="cursor-pointer hover:border-zinc-400"
-                      onClick={() =>
-                        router.push(`/tournament/${id}/match/${m.id}`)
-                      }
-                    >
-                      <div className="p-3 text-sm flex justify-between border-b">
-                        <span
-                          className={
-                            m.winnerId === m.playerAId
-                              ? "font-bold text-green-600"
-                              : ""
-                          }
-                        >
-                          {m.playerAName}
-                        </span>
-                        <span className="font-mono">{m.playerALegs}</span>
-                      </div>
-                      <div className="p-3 text-sm flex justify-between">
-                        <span
-                          className={
-                            m.winnerId === m.playerBId
-                              ? "font-bold text-green-600"
-                              : ""
-                          }
-                        >
-                          {m.playerBName}
-                        </span>
-                        <span className="font-mono">{m.playerBLegs}</span>
-                      </div>
-                    </Card>
-                  ))}
+                {matches.filter((m) => m.phase === "final").map(renderMatchCard)}
+                {matches.filter((m) => m.phase === "final").length === 0 && (
+                  <div className="text-xs text-zinc-400 italic">Folgt nach Halbfinale</div>
+                )}
               </div>
             </div>
+              );
+            })()}
           </TabsContent>
           <TabsContent value="results">
-            <Card>
-              <CardHeader>
-                <CardTitle>Tournament Results & Season Points</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {(() => {
-                    const finalMatch = matches.find((m) => m.phase === "final");
-                    const semiMatches = matches.filter(
-                      (m) => m.phase === "semi",
-                    );
-                    const quarterMatches = matches.filter(
-                      (m) => m.phase === "quarter",
-                    );
+            {(() => {
+              const finalMatch = matches.find((m) => m.phase === "final");
+              const semiMatches = matches.filter((m) => m.phase === "semi");
+              const quarterMatches = matches.filter((m) => m.phase === "quarter");
 
-                    let rankedPlayers = [...players].map((p) => {
-                      let rankScore = 0;
-                      if (finalMatch?.winnerId === p.id) rankScore = 10000;
-                      else if (
-                        finalMatch &&
-                        (finalMatch.playerAId === p.id ||
-                          finalMatch.playerBId === p.id)
-                      )
-                        rankScore = 9000;
-                      else if (
-                        semiMatches.some(
-                          (m) => m.playerAId === p.id || m.playerBId === p.id,
-                        )
-                      )
-                        rankScore = 8000;
-                      else if (
-                        quarterMatches.some(
-                          (m) => m.playerAId === p.id || m.playerBId === p.id,
-                        )
-                      )
-                        rankScore = 7000;
+              let rankedPlayers = [...players].map((p) => {
+                let rankScore = 0;
+                if (finalMatch?.winnerId === p.id) rankScore = 10000;
+                else if (finalMatch && (finalMatch.playerAId === p.id || finalMatch.playerBId === p.id)) rankScore = 9000;
+                else if (semiMatches.some((m) => m.playerAId === p.id || m.playerBId === p.id)) rankScore = 8000;
+                else if (quarterMatches.some((m) => m.playerAId === p.id || m.playerBId === p.id)) rankScore = 7000;
+                rankScore += (p.points || 0) * 100 + (p.wins || 0) * 10 - (p.losses || 0);
+                return { ...p, rankScore };
+              });
+              rankedPlayers.sort((a, b) => b.rankScore - a.rankScore);
 
-                      rankScore +=
-                        (p.points || 0) * 100 +
-                        (p.wins || 0) * 10 -
-                        (p.losses || 0);
+              const podiumColors = [
+                { border: "#D4AF37", bg: "from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20", text: "text-yellow-600 dark:text-yellow-400", label: "1. Platz", emoji: "🥇" },
+                { border: "#C0C0C0", bg: "from-zinc-50 to-slate-50 dark:from-zinc-800/40 dark:to-slate-800/40", text: "text-zinc-500 dark:text-zinc-400", label: "2. Platz", emoji: "🥈" },
+                { border: "#CD7F32", bg: "from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20", text: "text-orange-600 dark:text-orange-400", label: "3. Platz", emoji: "🥉" },
+              ];
 
-                      return { ...p, rankScore };
-                    });
+              const podium = rankedPlayers.slice(0, 3);
+              const rest = rankedPlayers.slice(3);
 
-                    rankedPlayers.sort((a, b) => b.rankScore - a.rankScore);
-
-                    return rankedPlayers.map((p, index) => {
-                      let seasonPoints = 1; // Participation
-                      if (p.stayedUntilFinal || index < 2) seasonPoints += 1; // Finalists automatically get it
-
-                      if (index === 0) seasonPoints += 6;
-                      else if (index === 1) seasonPoints += 5;
-                      else if (index === 2) seasonPoints += 4;
-                      else if (index === 3) seasonPoints += 2;
-                      else if (index === 4) seasonPoints += 2;
-
-                      return (
-                        <div
-                          key={p.id}
-                          className="flex items-center justify-between p-4 border dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600">
-                              {index + 1}
+              return (
+                <div className="space-y-6">
+                  {/* Podium */}
+                  {podium.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {podium.map((p, index) => {
+                        const colors = podiumColors[index];
+                        const avatar = getPlayerAvatar(p.id);
+                        return (
+                          <div
+                            key={p.id}
+                            className={`relative rounded-2xl border-2 bg-gradient-to-b ${colors.bg} p-5 flex flex-col items-center gap-3 text-center`}
+                            style={{ borderColor: colors.border }}
+                          >
+                            <span className={`text-xs font-bold uppercase tracking-widest ${colors.text}`}>{colors.label}</span>
+                            <div className="relative">
+                              {avatar ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={avatar} alt="" className="w-20 h-20 rounded-full object-cover border-4" style={{ borderColor: colors.border }} />
+                              ) : (
+                                <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl border-4" style={{ borderColor: colors.border, background: "var(--card-background, #f4f4f5)" }}>
+                                  {colors.emoji}
+                                </div>
+                              )}
+                              {avatar && (
+                                <span className="absolute -bottom-2 -right-2 text-2xl">{colors.emoji}</span>
+                              )}
                             </div>
                             <div>
-                              <div className="font-bold">{p.name}</div>
-                              <div className="text-sm text-zinc-500">
-                                {seasonPoints} Season Points
+                              <div className="font-bold text-lg leading-tight" style={getPlayerNickname(p.id) ? headingStyle : undefined}>
+                                {getDisplayName(p.id, p.name)}
+                              </div>
+                              {getPlayerNickname(p.id) && (
+                                <div className="text-xs text-zinc-400 mt-0.5">{p.name}</div>
+                              )}
+                            </div>
+                            <div className="text-xs text-zinc-500 space-y-0.5 w-full">
+                              <div className="flex justify-between px-2">
+                                <span>Spiele</span><span className="font-semibold">{p.matchesPlayed}</span>
+                              </div>
+                              <div className="flex justify-between px-2">
+                                <span>Siege / Ndl.</span><span className="font-semibold">{p.wins} / {p.losses}</span>
                               </div>
                             </div>
+                            {isAdmin && (
+                              <label className="text-xs flex items-center gap-1.5 cursor-pointer text-zinc-500 mt-1">
+                                <input
+                                  type="checkbox"
+                                  checked={p.stayedUntilFinal || index < 2}
+                                  disabled={index < 2}
+                                  onChange={async (e) => {
+                                    await updateDoc(doc(db, "tournaments", id, "players", p.id), { stayedUntilFinal: e.target.checked });
+                                  }}
+                                  className="rounded border-zinc-300 dark:border-zinc-600"
+                                />
+                                Bis Finale geblieben
+                              </label>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={p.stayedUntilFinal || index < 2}
-                                disabled={index < 2}
-                                onChange={async (e) => {
-                                  await updateDoc(
-                                    doc(db, "tournaments", id, "players", p.id),
-                                    {
-                                      stayedUntilFinal: e.target.checked,
-                                    },
-                                  );
-                                }}
-                                className="rounded border-zinc-300"
-                              />
-                              Stayed until final
-                            </label>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Rest der Teilnehmer */}
+                  {rest.length > 0 && (
+                    <Card>
+                      <CardContent className="p-0">
+                        {rest.map((p, i) => {
+                          const index = i + 3;
+                          return (
+                            <div key={p.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0 dark:border-zinc-800">
+                              <span className="w-6 text-sm text-zinc-500 font-semibold text-center">{index + 1}.</span>
+                              <div className="relative flex-shrink-0">
+                                {getPlayerAvatar(p.id) ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={getPlayerAvatar(p.id)!} alt="" className="w-9 h-9 rounded-full object-cover border-2 border-zinc-200 dark:border-zinc-700" />
+                                ) : (
+                                  <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-sm font-bold text-zinc-500">
+                                    {getDisplayName(p.id, p.name).charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-sm truncate" style={getPlayerNickname(p.id) ? headingStyle : undefined}>
+                                  {getDisplayName(p.id, p.name)}
+                                </div>
+                                <div className="text-xs text-zinc-500">{p.matchesPlayed} Spiele · {p.wins}S / {p.losses}N</div>
+                              </div>
+                              {isAdmin && (
+                                <label className="text-xs flex items-center gap-1.5 cursor-pointer text-zinc-500 flex-shrink-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={p.stayedUntilFinal || false}
+                                    onChange={async (e) => {
+                                      await updateDoc(doc(db, "tournaments", id, "players", p.id), { stayedUntilFinal: e.target.checked });
+                                    }}
+                                    className="rounded border-zinc-300 dark:border-zinc-600"
+                                  />
+                                  Bis Finale
+                                </label>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {rankedPlayers.length === 0 && (
+                    <div className="py-12 text-center border-2 border-dashed rounded-lg border-zinc-200 dark:border-zinc-700">
+                      <p className="text-zinc-500">Noch keine Ergebnisse vorhanden.</p>
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
+              );
+            })()}
           </TabsContent>
         </Tabs>
 

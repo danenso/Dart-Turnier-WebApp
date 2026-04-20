@@ -47,6 +47,13 @@ export default function PlayersPage() {
     localStorage.setItem('players-view-mode', mode);
   };
 
+  const headingStyle: React.CSSProperties = {
+    fontFamily: "var(--font-heading, sans-serif)",
+    fontWeight: "var(--heading-weight, 700)" as any,
+    textTransform: "var(--heading-transform, none)" as any,
+    fontStyle: "var(--heading-style, normal)",
+  };
+
   useEffect(() => {
     if (!isAuthReady || !user) return;
 
@@ -184,7 +191,7 @@ export default function PlayersPage() {
                     <div className="min-w-0 flex-1">
                       {player.nickname ? (
                         <>
-                          <h3 className="text-sm leading-tight truncate font-medium">{player.nickname}</h3>
+                          <h3 className="text-sm leading-tight truncate font-medium" style={headingStyle}>{player.nickname}</h3>
                           <p className="text-xs text-zinc-500 truncate">{player.name}</p>
                         </>
                       ) : (
@@ -257,7 +264,7 @@ export default function PlayersPage() {
                     <div className="min-w-0 flex-1">
                       {player.nickname ? (
                         <>
-                          <h3 className="text-xl leading-tight truncate">{player.nickname}</h3>
+                          <h3 className="text-xl leading-tight truncate" style={headingStyle}>{player.nickname}</h3>
                           <p className="text-sm text-zinc-500 truncate">{player.name}</p>
                         </>
                       ) : (

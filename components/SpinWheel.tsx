@@ -75,23 +75,13 @@ export function SpinWheel({ targetNumber, onComplete, size = 280 }: SpinWheelPro
         Zielzahl für diesen Tiebreak wird ausgelost
       </p>
 
-      {/* Zeiger oben */}
+      {/* Zeiger unten */}
       <div className="relative" style={{ width: size, height: size + 20 }}>
-        {/* Pfeil-Zeiger */}
-        <div
-          className="absolute left-1/2 -translate-x-1/2 z-10"
-          style={{ top: 0 }}
-        >
-          <svg width="20" height="28" viewBox="0 0 20 28">
-            <polygon points="10,0 20,20 10,14 0,20" fill="#ef4444" />
-          </svg>
-        </div>
-
         {/* Rad */}
         <div
           style={{
             position: 'absolute',
-            top: 20,
+            top: 0,
             left: 0,
             width: size,
             height: size,
@@ -141,6 +131,16 @@ export function SpinWheel({ targetNumber, onComplete, size = 280 }: SpinWheelPro
             {/* Bull */}
             <circle cx={cx} cy={cy} r={innerR} fill="#b01919" stroke="#222" strokeWidth="1" />
             <circle cx={cx} cy={cy} r={innerR * 0.45} fill="#1e7a1e" stroke="#111" strokeWidth="1" />
+          </svg>
+        </div>
+
+        {/* Pfeil-Zeiger unten */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 z-10"
+          style={{ bottom: 0 }}
+        >
+          <svg width="20" height="28" viewBox="0 0 20 28" style={{ transform: 'rotate(180deg)' }}>
+            <polygon points="10,0 20,20 10,14 0,20" fill="#ef4444" />
           </svg>
         </div>
       </div>

@@ -18,6 +18,7 @@ interface LigaSidebarItem {
   id: string;
   name: string;
   abbreviation?: string;
+  themeColor?: string;
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -50,7 +51,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const q = query(collection(db, "liga"), where("ownerId", "==", user.uid));
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs
-        .map((d) => ({ id: d.id, name: d.data().name, abbreviation: d.data().abbreviation }))
+        .map((d) => ({ id: d.id, name: d.data().name, abbreviation: d.data().abbreviation, themeColor: d.data().themeColor }))
         .sort((a, b) => a.name.localeCompare(b.name));
       setLigen(docs);
     });
@@ -192,15 +193,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                             {liga.abbreviation ? (
                               <span
                                 className="text-[10px] font-black font-mono w-8 shrink-0 text-center leading-none px-1 py-0.5 rounded"
-                                style={ligaActive ? { color: primary, backgroundColor: primary + "18" } : { color: "rgb(107 114 128)" }}
+                                style={ligaActive
+                                  ? { color: liga.themeColor || primary, backgroundColor: (liga.themeColor || primary) + "18" }
+                                  : liga.themeColor
+                                    ? { color: liga.themeColor }
+                                    : { color: "rgb(107 114 128)" }
+                                }
                               >
                                 {liga.abbreviation}
                               </span>
                             ) : (
-                              <Icon
-                                icon="mdi:shield-outline"
-                                className="w-3.5 h-3.5 shrink-0"
-                                style={ligaActive ? { color: primary } : undefined}
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: liga.themeColor || "rgb(161 161 170)" }}
                               />
                             )}
                             <span className="truncate text-xs">{liga.name}</span>

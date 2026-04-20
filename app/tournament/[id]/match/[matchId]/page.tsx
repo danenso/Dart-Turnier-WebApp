@@ -21,6 +21,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { ArrowLeft, Radius, Undo2, ChevronRight, Volume2, VolumeX, Eye, Target } from "lucide-react";
+import { useThemeCustomizer } from "@/components/ThemeCustomizerProvider";
 import { DartboardStarter } from "@/components/DartboardStarter";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -37,6 +38,8 @@ interface Dart {
 export default function MatchPage() {
   const { id, matchId } = useParams() as { id: string; matchId: string };
   const { user, isAuthReady, isAdmin } = useFirebase();
+  const { settings } = useThemeCustomizer();
+  const primaryColor = settings.primaryColor || "#D4AF37";
   const router = useRouter();
 
   const [match, setMatch] = useState<any>(null);
@@ -954,7 +957,15 @@ export default function MatchPage() {
       <div className="flex-1 min-w-0">
         {profile?.nickname ? (
           <>
-            <div className={`font-black text-zinc-900 dark:text-white truncate leading-tight ${compact ? "text-base" : "text-xl"}`}>
+            <div
+              className={`font-black text-zinc-900 dark:text-white truncate leading-tight ${compact ? "text-base" : "text-xl"}`}
+              style={{
+                fontFamily: "var(--font-heading, sans-serif)",
+                fontWeight: "var(--heading-weight, 700)",
+                textTransform: "var(--heading-transform, none)" as any,
+                fontStyle: "var(--heading-style, normal)",
+              }}
+            >
               {profile.nickname}
             </div>
             <div className={`text-zinc-500 truncate leading-tight ${compact ? "text-[11px]" : "text-xs"}`}>
@@ -978,11 +989,14 @@ export default function MatchPage() {
         "w-16 h-16";
       const fontSize = size === "sm" ? "text-2xl" : size === "md" ? "text-3xl" : "text-4xl";
       return (
-        <div className={`${cls} rounded-full overflow-hidden shrink-0 border-2 ${
-          isBot
-            ? "bg-amber-50 dark:bg-amber-950/40 border-amber-400/50 flex items-center justify-center"
-            : `bg-zinc-300 dark:bg-zinc-700 ${isActive ? "border-blue-400/50" : "border-zinc-300 dark:border-zinc-600"}`
-        }`}>
+        <div
+          className={`${cls} rounded-full overflow-hidden shrink-0 border-2 ${
+            isBot
+              ? "bg-amber-50 dark:bg-amber-950/40 border-amber-400/50 flex items-center justify-center"
+              : `bg-zinc-300 dark:bg-zinc-700 ${isActive ? "" : "border-zinc-300 dark:border-zinc-600"}`
+          }`}
+          style={(!isBot && isActive) ? { borderColor: primaryColor + "80" } : undefined}
+        >
           {isBot ? (
             <span className={`${fontSize} select-none`}>🤖</span>
           ) : profile?.avatar ? (
@@ -1042,8 +1056,9 @@ export default function MatchPage() {
                 : `${i}-empty`
             }
             className={`${large ? "text-sm" : "text-xs"} font-mono font-semibold tabular-nums ${
-              displayDarts[i] ? "text-blue-500 dark:text-blue-300 dart-pop" : "text-zinc-400 dark:text-zinc-700"
+              displayDarts[i] ? "dart-pop" : "text-zinc-400 dark:text-zinc-700"
             }`}
+            style={displayDarts[i] ? { color: primaryColor } : undefined}
           >
             {displayDarts[i] ? formatDart(displayDarts[i]) : "–"}
           </span>
@@ -1061,15 +1076,13 @@ export default function MatchPage() {
 
     return (
       <div
-        className={`relative flex-1 min-h-0 border-b last:border-b-0 md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 transition-colors duration-300 overflow-hidden ${
-          isActive ? "bg-blue-50 dark:bg-blue-950/40" : "bg-zinc-50 dark:bg-zinc-900/30"
-        }`}
+        className="relative flex-1 min-h-0 border-b last:border-b-0 md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 transition-colors duration-300 overflow-hidden bg-zinc-50 dark:bg-zinc-900/30"
+        style={isActive ? { backgroundColor: primaryColor + "12" } : undefined}
       >
         {/* Active indicator bar */}
         <div
-          className={`absolute left-0 top-0 bottom-0 w-1 rounded-r transition-colors duration-300 z-10 ${
-            isActive ? "bg-blue-400" : "bg-transparent"
-          }`}
+          className="absolute left-0 top-0 bottom-0 w-1 rounded-r transition-colors duration-300 z-10"
+          style={{ backgroundColor: isActive ? primaryColor : "transparent" }}
         />
 
         {/* KI denkt… Overlay */}
@@ -1083,7 +1096,7 @@ export default function MatchPage() {
         )}
 
         {/* ── Mobile layout ── */}
-        <div className="flex md:hidden flex-col h-full px-3 py-2.5 pl-4 gap-2">
+        <div className="flex md:hidden flex-col h-full px-3 py-2 pl-4 gap-1.5 overflow-y-auto">
           {/* Zeile 1: Avatar+Name links | Score mittig | Legs rechts */}
           <div className="flex items-center gap-2 flex-1 min-h-0">
             {/* Links: Avatar + Nickname/Name */}
@@ -1162,7 +1175,7 @@ export default function MatchPage() {
         .fade-in-up       { animation: fadeInUp 0.45s ease-out both; }
       `}</style>
 
-      <div className="fixed inset-0 z-40 flex flex-col bg-white dark:bg-zinc-950 overflow-hidden">
+      <div className="fixed inset-0 z-40 flex flex-col bg-white dark:bg-zinc-950 overflow-hidden" style={{ height: "100dvh" }}>
 
         {/* Header */}
         <header className="bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 flex items-center justify-between shrink-0">
@@ -1197,9 +1210,10 @@ export default function MatchPage() {
             onClick={() => setVoiceEnabled((v) => !v)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
               voiceEnabled
-                ? "bg-blue-500/20 border border-blue-500/40 text-blue-400 hover:bg-blue-500/30"
+                ? "border"
                 : "bg-zinc-200 border border-zinc-300 text-zinc-500 hover:bg-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 dark:hover:bg-zinc-700"
             }`}
+            style={voiceEnabled ? { backgroundColor: primaryColor + "20", borderColor: primaryColor + "50", color: primaryColor } : undefined}
             title={voiceEnabled ? "Sound ausschalten" : "Sound einschalten"}
           >
             {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -1249,7 +1263,7 @@ export default function MatchPage() {
               {nextMatchId && (
                 <Button
                   size="lg"
-                  className="bg-blue-600 hover:bg-blue-700"
+                  style={{ backgroundColor: primaryColor, color: "#fff" }}
                   onClick={() =>
                     router.push(`/tournament/${id}/match/${nextMatchId}`)
                   }
@@ -1280,7 +1294,7 @@ export default function MatchPage() {
             {/* Info bar */}
             <div className="bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-4 py-2 flex items-center justify-between text-sm shrink-0">
               <span className="text-zinc-600 dark:text-zinc-300">
-                <span className="text-blue-400 font-bold">
+                <span className="font-bold" style={{ color: primaryColor }}>
                   {match.currentTurnId === match.playerAId
                     ? match.playerAName
                     : match.playerBName}

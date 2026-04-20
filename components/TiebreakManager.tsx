@@ -101,10 +101,34 @@ export function TiebreakManager({
         return;
       }
     }
+
+    // Nach mind. 3 Runden: prüfen ob klarer Gewinner (kein Gleichstand)
+    const nextRound = tiebreak.currentRound + 1;
+    if (nextRound > 3) {
+      const totals = tiebreak.playerIds.map((id: string) => {
+        let total = 0;
+        for (let r = 1; r <= tiebreak.currentRound; r++) total += scores[id]?.[r] || 0;
+        return { id, total };
+      }).sort((a: any, b: any) => b.total - a.total);
+      const hasTie = totals[0].total === totals[1].total;
+      if (!hasTie) {
+        // Auto-abschließen
+        try {
+          await updateDoc(
+            doc(db, "tournaments", tournamentId, "tiebreaks", tiebreak.id),
+            { scores, currentRound: nextRound, status: "completed", finalOrder: totals.map((p: any) => p.id) },
+          );
+        } catch (error) {
+          handleFirestoreError(error, OperationType.UPDATE, `tournaments/${tournamentId}/tiebreaks/${tiebreak.id}`);
+        }
+        return;
+      }
+    }
+
     try {
       await updateDoc(
         doc(db, "tournaments", tournamentId, "tiebreaks", tiebreak.id),
-        { scores, currentRound: tiebreak.currentRound + 1 },
+        { scores, currentRound: nextRound },
       );
     } catch (error) {
       handleFirestoreError(
@@ -173,14 +197,23 @@ export function TiebreakManager({
     return tiebreak.playerNames[idx] || id;
   };
 
+  const headingStyle: React.CSSProperties = {
+    fontFamily: "var(--font-heading, sans-serif)",
+    fontWeight: "var(--heading-weight, 700)" as any,
+    textTransform: "var(--heading-transform, none)" as any,
+    fontStyle: "var(--heading-style, normal)",
+  };
+
   return (
     <Card className="mb-6">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
           <span>Tiebreak-Gruppe</span>
-          <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm">
-            Zielzahl: {tiebreak.targetNumber}
-          </span>
+          {tiebreak.spinWheelShown && (
+            <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm">
+              Zielzahl: {tiebreak.targetNumber}
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -215,7 +248,7 @@ export function TiebreakManager({
                 key={pId}
                 className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-900 p-3 rounded border dark:border-zinc-800"
               >
-                <span className="font-medium">
+                <span className="font-medium" style={headingStyle}>
                   {idx + 1}. {getPlayerName(pId)}
                 </span>
                 {isAdmin && (
@@ -271,7 +304,7 @@ export function TiebreakManager({
                     let total = 0;
                     return (
                       <tr key={pId} className="border-b dark:border-zinc-800">
-                        <td className="px-4 py-2 font-medium">
+                        <td className="px-4 py-2 font-medium" style={headingStyle}>
                           {getPlayerName(pId)}
                         </td>
                         {Array.from({

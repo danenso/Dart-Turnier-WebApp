@@ -497,7 +497,7 @@ export default function PlayerEditPage() {
 
           <div className="flex justify-end gap-2 pt-4">
             <Link href="/players">
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline">Abbrechen</Button>
             </Link>
             <Button onClick={handleSave} disabled={isSaving || isProcessing || isUploadingSong}>
               {isUploadingSong ? "Song wird hochgeladen..." : isProcessing ? "Wird verarbeitet..." : isSaving ? "Wird gespeichert..." : "Speichern"}
@@ -527,7 +527,7 @@ export default function PlayerEditPage() {
               onClick={handleDelete}
               disabled={isSaving}
             >
-              {isSaving ? "Deleting..." : "Delete"}
+              {isSaving ? "Wird gelöscht..." : "Löschen"}
             </Button>
           </DialogFooter>
         </DialogContent>
