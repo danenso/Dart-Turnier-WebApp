@@ -89,7 +89,7 @@ export default function TournamentsPage() {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
   // Ansicht
-  const [viewMode, setViewMode] = useState<"card" | "list">("card");
+  const [viewMode, setViewMode] = useState<"card" | "list">("list");
 
   useEffect(() => {
     if (!isAuthReady || !user) return;

@@ -1042,15 +1042,15 @@ export default function TournamentPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="relative mb-0 h-[45px]">
-            <TabsList 
+          <div className="relative mb-0 h-[36px]">
+            <TabsList
               ref={scrollRef}
               onMouseDown={handleMouseDown}
               onMouseLeave={handleMouseLeave}
               onMouseUp={handleMouseUp}
               onMouseMove={handleMouseMove}
               className={cn(
-                "flex w-full overflow-x-auto justify-start gap-3 h-[46px] bg-transparent p-2 pb-2 select-none",
+                "flex w-full overflow-x-auto justify-start gap-2 h-[36px] bg-transparent p-0 select-none",
                 "cursor-grab active:cursor-grabbing",
                 "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
               )}
@@ -1058,7 +1058,7 @@ export default function TournamentPage() {
               <TabsTrigger 
                 value="participants"
                 className={cn(
-                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "flex-none rounded-full px-4 py-1 text-sm font-semibold transition-all duration-200",
                   "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
                   "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
                   "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
@@ -1072,7 +1072,7 @@ export default function TournamentPage() {
                 value="groups"
                 disabled={tournament.status === "draft"}
                 className={cn(
-                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "flex-none rounded-full px-4 py-1 text-sm font-semibold transition-all duration-200",
                   "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
                   "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
                   "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
@@ -1086,7 +1086,7 @@ export default function TournamentPage() {
                 value="matches"
                 disabled={tournament.status === "draft"}
                 className={cn(
-                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "flex-none rounded-full px-4 py-1 text-sm font-semibold transition-all duration-200",
                   "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
                   "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
                   "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
@@ -1100,7 +1100,7 @@ export default function TournamentPage() {
                 value="tiebreaks"
                 disabled={tournament.status !== "tiebreaks"}
                 className={cn(
-                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "flex-none rounded-full px-4 py-1 text-sm font-semibold transition-all duration-200",
                   "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
                   "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
                   "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
@@ -1116,7 +1116,7 @@ export default function TournamentPage() {
                   tournament.status,
                 )}
                 className={cn(
-                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "flex-none rounded-full px-4 py-1 text-sm font-semibold transition-all duration-200",
                   "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
                   "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
                   "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
@@ -1130,7 +1130,7 @@ export default function TournamentPage() {
                 value="results"
                 disabled={tournament.status !== "completed"}
                 className={cn(
-                  "flex-none rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200",
+                  "flex-none rounded-full px-4 py-1 text-sm font-semibold transition-all duration-200",
                   "bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800",
                   "text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-100",
                   "data-[state=active]:bg-zinc-900 data-[state=active]:text-white data-[state=active]:border-zinc-900",
@@ -1488,42 +1488,58 @@ export default function TournamentPage() {
           </TabsContent>
 
           <TabsContent value="bracket">
-            {/* Helper to render a bracket match card */}
+            {/* Helper to render a bracket match card with winner highlighting + name+nickname */}
             {(() => {
+              const renderBracketPlayer = (playerId: string, playerName: string, isWinner: boolean) => {
+                const nickname = getPlayerNickname(playerId);
+                const avatar = getPlayerAvatar(playerId);
+                return (
+                  <div className={`p-2.5 text-sm flex items-center justify-between ${isWinner ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatar} alt="" className={`w-5 h-5 rounded-full object-cover shrink-0 ${isWinner ? "ring-2 ring-green-400" : ""}`} />
+                      ) : (
+                        <div className={`w-5 h-5 rounded-full shrink-0 ${isWinner ? "bg-green-200 dark:bg-green-800" : "bg-zinc-200 dark:bg-zinc-700"}`} />
+                      )}
+                      <div className="min-w-0">
+                        <div
+                          className={`truncate text-sm font-semibold ${isWinner ? "text-green-700 dark:text-green-400" : "text-zinc-800 dark:text-zinc-200"}`}
+                          style={nickname ? headingStyle : undefined}
+                        >
+                          {getDisplayName(playerId, playerName)}
+                        </div>
+                        {nickname && (
+                          <div className="text-[10px] text-zinc-400 truncate">{playerName}</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              };
+
               const renderMatchCard = (m: any) => (
                 <Card
                   key={m.id}
-                  className="cursor-pointer hover:border-zinc-400"
+                  className={`cursor-pointer overflow-hidden transition-all ${m.status === "completed" ? "hover:border-green-400" : "hover:border-zinc-400"}`}
                   onClick={() => router.push(`/tournament/${id}/match/${m.id}`)}
                 >
-                  <div className="p-3 text-sm flex items-center justify-between border-b dark:border-zinc-700">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {getPlayerAvatar(m.playerAId) ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={getPlayerAvatar(m.playerAId)!} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full bg-zinc-200 dark:bg-zinc-700 shrink-0" />
-                      )}
-                      <span className={`truncate ${m.winnerId === m.playerAId ? "font-bold" : ""}`} style={getPlayerNickname(m.playerAId) ? headingStyle : undefined}>
-                        {getDisplayName(m.playerAId, m.playerAName)}
-                      </span>
-                    </div>
-                    <span className="font-mono ml-2">{m.playerALegs}</span>
+                  <div className={`border-b ${m.winnerId === m.playerAId ? "border-green-200 dark:border-green-800" : "dark:border-zinc-700"}`}>
+                    {renderBracketPlayer(m.playerAId, m.playerAName, m.winnerId === m.playerAId)}
                   </div>
-                  <div className="p-3 text-sm flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {getPlayerAvatar(m.playerBId) ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={getPlayerAvatar(m.playerBId)!} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full bg-zinc-200 dark:bg-zinc-700 shrink-0" />
-                      )}
-                      <span className={`truncate ${m.winnerId === m.playerBId ? "font-bold" : ""}`} style={getPlayerNickname(m.playerBId) ? headingStyle : undefined}>
-                        {getDisplayName(m.playerBId, m.playerBName)}
+                  {renderBracketPlayer(m.playerBId, m.playerBName, m.winnerId === m.playerBId)}
+                  {m.status === "completed" && (
+                    <div className="px-2.5 pb-1.5 flex items-center gap-1.5">
+                      <span className="text-[10px] text-zinc-400">
+                        {m.playerALegs ?? 0}–{m.playerBLegs ?? 0}
                       </span>
+                      {m.winnerId && (
+                        <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">
+                          ✓ {getDisplayName(m.winnerId === m.playerAId ? m.playerAId : m.playerBId, m.winnerId === m.playerAId ? m.playerAName : m.playerBName)} weiter
+                        </span>
+                      )}
                     </div>
-                    <span className="font-mono ml-2">{m.playerBLegs}</span>
-                  </div>
+                  )}
                 </Card>
               );
 
@@ -1560,19 +1576,23 @@ export default function TournamentPage() {
                     for (let i = 0; i < qf.length; i += 2) pairs.push(qf.slice(i, i + 2));
                     return (
                       <div className="space-y-4">
-                        {pairs.map((pair, pi) => (
+                        {pairs.map((pair, pi) => {
+                          const pairDone = pair.length === 2 && pair.every((m: any) => m.status === "completed");
+                          const connColor = pairDone ? "border-green-400 dark:border-green-600" : "border-zinc-200 dark:border-zinc-700";
+                          return (
                           <div key={pi} className={`relative ${pi > 0 ? "mt-4" : ""}`}>
                             <div className="space-y-4">
                               {pair.map(renderMatchCard)}
                             </div>
                             {pair.length === 2 && (
                               <div className="absolute -right-5 inset-y-0 w-5 pointer-events-none flex flex-col">
-                                <div className="flex-1 border-t-2 border-r-2 border-zinc-200 dark:border-zinc-700 rounded-tr-lg" />
-                                <div className="flex-1 border-b-2 border-r-2 border-zinc-200 dark:border-zinc-700 rounded-br-lg" />
+                                <div className={`flex-1 border-t-2 border-r-2 ${connColor} rounded-tr-lg`} />
+                                <div className={`flex-1 border-b-2 border-r-2 ${connColor} rounded-br-lg`} />
                               </div>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     );
                   })()}
@@ -1604,15 +1624,17 @@ export default function TournamentPage() {
                 {/* SF matches with bracket connector to final */}
                 {(() => {
                   const sf = matches.filter((m) => m.phase === "semi");
+                  const sfDone = sf.length === 2 && sf.every((m: any) => m.status === "completed");
+                  const sfConn = sfDone ? "border-green-400 dark:border-green-600" : "border-zinc-200 dark:border-zinc-700";
                   return (
-                    <div className={`relative ${sf.length === 2 ? "" : ""}`}>
+                    <div className="relative">
                       <div className="space-y-4">
                         {sf.map(renderMatchCard)}
                       </div>
                       {sf.length === 2 && (
                         <div className="absolute -right-5 inset-y-0 w-5 pointer-events-none flex flex-col">
-                          <div className="flex-1 border-t-2 border-r-2 border-zinc-200 dark:border-zinc-700 rounded-tr-lg" />
-                          <div className="flex-1 border-b-2 border-r-2 border-zinc-200 dark:border-zinc-700 rounded-br-lg" />
+                          <div className={`flex-1 border-t-2 border-r-2 ${sfConn} rounded-tr-lg`} />
+                          <div className={`flex-1 border-b-2 border-r-2 ${sfConn} rounded-br-lg`} />
                         </div>
                       )}
                     </div>

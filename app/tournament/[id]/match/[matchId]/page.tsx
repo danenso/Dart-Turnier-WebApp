@@ -50,7 +50,9 @@ export default function MatchPage() {
   const [nextMatchId, setNextMatchId] = useState<string | null>(null);
   const [playerAProfile, setPlayerAProfile] = useState<any>(null);
   const [playerBProfile, setPlayerBProfile] = useState<any>(null);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(() => {
+    try { return localStorage.getItem('dart-sound-enabled') !== 'false'; } catch { return true; }
+  });
   const [aiThinking, setAiThinking] = useState(false);
   const [profilesLoaded, setProfilesLoaded] = useState(false);
   const [dartboardMode, setDartboardMode] = useState(false);
@@ -64,6 +66,8 @@ export default function MatchPage() {
 
   // Keep voiceEnabledRef in sync so onSnapshot closure can read current value
   useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
+  // Persist sound setting globally
+  useEffect(() => { try { localStorage.setItem('dart-sound-enabled', voiceEnabled ? 'true' : 'false'); } catch {} }, [voiceEnabled]);
 
   const canInput = isAdmin ||
     !profilesLoaded ||

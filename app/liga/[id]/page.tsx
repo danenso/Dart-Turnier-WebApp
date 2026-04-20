@@ -526,8 +526,7 @@ export default function LigaDetailPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3 text-zinc-900 dark:text-zinc-100">
-                <Icon icon="mdi:podium-gold" className="w-8 h-8 text-emerald-500 shrink-0" />
+              <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
                 {liga.name}
               </h1>
               <p className="text-zinc-500 dark:text-zinc-400 mt-1">
@@ -640,11 +639,12 @@ export default function LigaDetailPage() {
                         ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30"
                         : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900";
 
+                  const themeColor = liga.themeColor ?? "#10b981";
                   return (
                     <div
                       key={game.id}
                       className={cn(
-                        "shrink-0 w-36 rounded-xl border p-3 transition-all",
+                        "shrink-0 w-36 rounded-xl border-2 p-3 transition-all",
                         statusColor,
                         isAdmin
                           ? "cursor-pointer hover:shadow-md dark:hover:shadow-zinc-900"
@@ -652,6 +652,7 @@ export default function LigaDetailPage() {
                             ? "cursor-pointer hover:shadow-md dark:hover:shadow-zinc-900"
                             : "",
                       )}
+                      style={{ borderColor: game.status === "completed" ? themeColor + "80" : game.status === "in_progress" ? themeColor : themeColor + "40" }}
                       onClick={() => {
                         if (isAdmin) openEditGame(game);
                         else if (game.tournamentId) router.push(`/tournament/${game.tournamentId}`);

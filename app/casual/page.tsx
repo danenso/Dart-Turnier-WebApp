@@ -68,6 +68,7 @@ export default function CasualGamesPage() {
   const [singleMatchStartConfig, setSingleMatchStartConfig] = useState<MatchStartConfig>(DEFAULT_MATCH_START);
   const [isVsAI, setIsVsAI] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>("medium");
+  const [isPublicGame, setIsPublicGame] = useState(true);
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
@@ -192,6 +193,7 @@ export default function CasualGamesPage() {
           matchStartConfig: singleMatchStartConfig,
           createdAt: new Date().toISOString(),
           ownerId: user.uid,
+          isPublic: isVsAI ? false : isPublicGame,
           ...(isVsAI ? { aiDifficulty, isVsAI: true } : {}),
         });
 
@@ -244,6 +246,7 @@ export default function CasualGamesPage() {
           type: "casual_tiebreak",
           createdAt: new Date().toISOString(),
           ownerId: user.uid,
+          isPublic: isPublicGame,
         });
 
         const targetNumber = Math.floor(Math.random() * 20) + 1;
@@ -957,6 +960,24 @@ export default function CasualGamesPage() {
                   </div>
                 )}
               </div>
+              {/* Public/Private Toggle */}
+              {!isVsAI && (
+                <div className="flex items-center justify-between rounded-lg border border-zinc-200 dark:border-zinc-700 px-3 py-2.5">
+                  <div>
+                    <p className="text-sm font-medium">{isPublicGame ? "Öffentlich" : "Privat"}</p>
+                    <p className="text-xs text-zinc-400">
+                      {isPublicGame ? "Wird in der Übersicht angezeigt" : "Nur für dich sichtbar"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPublicGame((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${isPublicGame ? "bg-green-500" : "bg-zinc-300 dark:bg-zinc-600"}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isPublicGame ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </div>
+              )}
               {formError && (
                 <p className="text-sm text-red-500 px-1">{formError}</p>
               )}
