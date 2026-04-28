@@ -183,8 +183,12 @@ export async function fetchPlayerMatches(playerId: string): Promise<MatchStats[]
   });
 
   const tournamentIds = [...new Set(allDocs.map(d => d.ref.parent.parent!.id))];
-  const tournamentDocs = await Promise.all(tournamentIds.map(id => getDoc(doc(db, 'tournaments', id))));
-  const tournaments = new Map(tournamentDocs.map(d => [d.id, d.data()]));
+  const tournamentResults = await Promise.allSettled(tournamentIds.map(id => getDoc(doc(db, 'tournaments', id))));
+  const tournaments = new Map(
+    tournamentResults
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+      .map(r => [r.value.id, r.value.data()])
+  );
 
   const matchStats: MatchStats[] = allDocs.map(matchDoc => {
     const m = matchDoc.data();
