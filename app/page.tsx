@@ -56,8 +56,10 @@ export default function Home() {
       setForgotMsg({ type: "success", text: "E-Mail zum Zurücksetzen wurde gesendet. Bitte prüfe deinen Posteingang (auch Spam)." });
     } catch (error: any) {
       const code = error?.code || "";
-      if (code.includes("user-not-found") || code.includes("invalid-email")) {
-        setForgotMsg({ type: "success", text: "Falls ein Konto mit dieser E-Mail existiert, wird eine E-Mail gesendet." });
+      if (code.includes("user-not-found")) {
+        setForgotMsg({ type: "error", text: "Diese E-Mail-Adresse ist nicht registriert." });
+      } else if (code.includes("invalid-email")) {
+        setForgotMsg({ type: "error", text: "Bitte eine gültige E-Mail-Adresse eingeben." });
       } else {
         setForgotMsg({ type: "error", text: "Fehler beim Senden. Bitte erneut versuchen." });
       }
@@ -175,7 +177,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => { setForgotMode(true); setForgotEmail(loginEmail); setForgotMsg(null); }}
-                    className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                    className="text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline underline-offset-2 transition-colors"
                   >
                     Passwort vergessen?
                   </button>
