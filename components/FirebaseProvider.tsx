@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { getDocFromServer, doc, setDoc } from 'firebase/firestore';
@@ -36,7 +35,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -122,7 +120,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const logOut = async () => {
     try {
       await signOut(auth);
-      router.push('/');
+      window.location.replace('/');
     } catch (error) {
       console.error('Error signing out', error);
     }
