@@ -58,6 +58,18 @@ service cloud.firestore {
              (!('earnedAchievements' in data) || data.earnedAchievements is list);
     }
 
+    function isValidGlobalPlayerUpdate(data) {
+      return hasRequiredFields(['name', 'ownerId', 'createdAt']) &&
+             isValidStringLength(data.name, 1, 50) &&
+             data.ownerId is string &&
+             isValidDateString(data.createdAt) &&
+             (!('email' in data) || data.email is string) &&
+             (!('authUid' in data) || data.authUid is string) &&
+             (!('avatar' in data) || data.avatar is string) &&
+             (!('nickname' in data) || data.nickname is string) &&
+             (!('earnedAchievements' in data) || data.earnedAchievements is list);
+    }
+
     function isValidTournament(data) {
       return hasRequiredFields(['title', 'status', 'createdAt', 'ownerId']) &&
              isValidStringLength(data.title, 1, 100) &&
@@ -166,7 +178,7 @@ service cloud.firestore {
     match /players/{playerId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidGlobalPlayer(request.resource.data);
-      allow update: if (isOwner(resource.data.ownerId) || isAdmin()) && isValidGlobalPlayer(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
+      allow update: if (isOwner(resource.data.ownerId) || isAdmin()) && isValidGlobalPlayerUpdate(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
       allow delete: if isOwner(resource.data.ownerId);
     }
 
