@@ -42,6 +42,7 @@ export default function PlayerEditPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPlayerAdmin, setIsPlayerAdmin] = useState(false);
+  const [emailSendError, setEmailSendError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Song state
@@ -157,9 +158,13 @@ export default function PlayerEditPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ playerName: name, email, password }),
           });
-          if (res.ok) invitationSent = true;
+          if (res.ok) {
+            invitationSent = true;
+          } else {
+            invitationSent = false;
+          }
         } catch {
-          // Mail-Fehler sind nicht kritisch – Speichern geht weiter
+          invitationSent = false;
         }
       }
 
@@ -207,6 +212,10 @@ export default function PlayerEditPage() {
 
       if (invitationSent) {
         router.push("/players?invited=1");
+      } else if (authUid && !player.authUid) {
+        // Konto wurde gerade neu erstellt, aber E-Mail konnte nicht gesendet werden
+        setEmailSendError(true);
+        setPlayer((prev: any) => ({ ...prev, authUid, email }));
       } else {
         router.push("/players");
       }
@@ -453,11 +462,13 @@ export default function PlayerEditPage() {
                   </div>
                   {!player?.authUid && (
                     <div className="space-y-2">
-                      <Label>Password (for initial setup)</Label>
+                      <Label>Passwort (für erstes Login)</Label>
                       <Input
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="new-password"
+                        placeholder="Mindestens 6 Zeichen"
                       />
                     </div>
                   )}
@@ -494,6 +505,28 @@ export default function PlayerEditPage() {
               </div>
             )}
           </div>
+
+          {emailSendError && (
+            <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2">
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                ⚠️ Konto erstellt – Einladungs-E-Mail konnte nicht gesendet werden
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Informiere den Spieler manuell mit diesen Zugangsdaten:
+              </p>
+              <div className="bg-white dark:bg-zinc-900 rounded p-2 text-sm font-mono space-y-1">
+                <div><span className="text-zinc-500">E-Mail:&nbsp;</span><strong>{email}</strong></div>
+                <div><span className="text-zinc-500">Passwort:&nbsp;</span><strong>{password}</strong></div>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-amber-600 dark:text-amber-400 underline"
+                onClick={() => { setEmailSendError(false); router.push("/players"); }}
+              >
+                Verstanden, weiter zur Spielerliste →
+              </button>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Link href="/players">

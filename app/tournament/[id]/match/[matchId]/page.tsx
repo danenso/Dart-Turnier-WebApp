@@ -788,10 +788,25 @@ export default function MatchPage() {
             </div>
           </div>
 
-          {/* Question */}
-          <p className="text-center text-zinc-500 dark:text-zinc-400 text-sm md:text-base mt-1 match-fade-down" style={{ animationDelay: "0.05s" }}>
-            {isCoinFlipMode ? "Münzwurf entscheidet wer beginnt" : isBullThrowMode ? "Bull-Wurf entscheidet wer beginnt" : "Wer beginnt das Spiel?"}
-          </p>
+          {isCoinFlipMode ? (
+            <p className="text-center text-zinc-500 dark:text-zinc-400 text-sm md:text-base mt-1 match-fade-down" style={{ animationDelay: "0.05s" }}>
+              Münzwurf entscheidet wer beginnt
+            </p>
+          ) : isBullThrowMode ? (
+            <div className="text-center mt-1 match-fade-down" style={{ animationDelay: "0.05s" }}>
+              <p className="text-zinc-900 dark:text-zinc-100 text-base md:text-lg font-semibold">
+                🎯 Bullwurf — wer beginnt Leg 1?
+              </p>
+              <p className="text-zinc-400 dark:text-zinc-500 text-xs md:text-sm mt-1">
+                Klicke auf den Spieler, der den Bullwurf gewonnen hat.
+                {bestOf > 1 && " · Die weiteren Legs wechseln automatisch."}
+              </p>
+            </div>
+          ) : (
+            <p className="text-center text-zinc-500 dark:text-zinc-400 text-sm md:text-base mt-1 match-fade-down" style={{ animationDelay: "0.05s" }}>
+              Wer beginnt das Spiel?
+            </p>
+          )}
 
           {/* Main area: Players + VS */}
           <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-0 px-4 md:px-8 py-6">
