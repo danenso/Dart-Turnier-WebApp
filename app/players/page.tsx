@@ -57,9 +57,7 @@ export default function PlayersPage() {
   useEffect(() => {
     if (!isAuthReady || !user) return;
 
-    const q = isAdmin
-      ? query(collection(db, 'players'), where('ownerId', '==', user.uid))
-      : query(collection(db, 'players'), where('authUid', '==', user.uid));
+    const q = query(collection(db, 'players'));
 
     const unsubscribe = onSnapshot(
       q,

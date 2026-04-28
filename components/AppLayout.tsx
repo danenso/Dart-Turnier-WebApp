@@ -22,7 +22,7 @@ interface LigaSidebarItem {
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, isAuthReady, logOut } = useFirebase();
+  const { user, isAuthReady, isAdmin, logOut } = useFirebase();
   const { t } = useLanguage();
   const getIcon = useAppIcon();
   const { settings } = useThemeCustomizer();
@@ -48,7 +48,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Load liga list for sidebar
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, "liga"), where("ownerId", "==", user.uid));
+    // Admins sehen nur ihre eigenen Ligen; Regular User sehen alle (Firestore-Regel erlaubt isAuthenticated())
+    const q = isAdmin
+      ? query(collection(db, "liga"), where("ownerId", "==", user.uid))
+      : query(collection(db, "liga"));
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs
         .map((d) => ({ id: d.id, name: d.data().name, abbreviation: d.data().abbreviation, themeColor: d.data().themeColor }))
@@ -56,7 +59,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       setLigen(docs);
     });
     return () => unsub();
-  }, [user]);
+  }, [user, isAdmin]);
 
   if (!isAuthReady) {
     return (
@@ -169,7 +172,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
                 {ligaExpanded && (
                   <div className="ml-4 mt-0.5 space-y-0.5 border-l border-zinc-200 dark:border-zinc-700 pl-3">
-                    {ligen.length === 0 ? (
+                    {ligen.length === 0 && isAdmin ? (
                       <Link
                         href="/liga"
                         className="block text-xs text-zinc-400 dark:text-zinc-500 py-1.5 px-2 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
@@ -213,18 +216,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                         );
                       })
                     )}
-                    <Link
-                      href="/liga"
-                      className={cn(
-                        "flex items-center gap-2 py-1.5 px-2 rounded-md text-xs transition-colors",
-                        pathname === "/liga"
-                          ? "text-zinc-700 dark:text-zinc-300 font-medium"
-                          : "text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300",
-                      )}
-                    >
-                      <Icon icon="mdi:view-list" className="w-3 h-3 shrink-0" />
-                      Alle Ligen
-                    </Link>
+                    {isAdmin && (
+                      <Link
+                        href="/liga"
+                        className={cn(
+                          "flex items-center gap-2 py-1.5 px-2 rounded-md text-xs transition-colors",
+                          pathname === "/liga"
+                            ? "text-zinc-700 dark:text-zinc-300 font-medium"
+                            : "text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300",
+                        )}
+                      >
+                        <Icon icon="mdi:view-list" className="w-3 h-3 shrink-0" />
+                        Alle Ligen
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>

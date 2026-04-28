@@ -197,8 +197,8 @@ export default function LigaDetailPage() {
       (snap) => {
         if (snap.exists()) {
           const data = { id: snap.id, ...(snap.data() as any) } as LigaDoc;
-          // Security: ensure user owns this liga
-          if (data.ownerId !== user.uid && !isAdmin) {
+          // Admins müssen Owner sein; Regular User dürfen alle Ligen lesen
+          if (isAdmin && data.ownerId !== user.uid) {
             router.push("/liga");
             return;
           }

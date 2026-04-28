@@ -42,10 +42,7 @@ export default function StandingsPage() {
   // Seasons laden
   useEffect(() => {
     if (!isAuthReady || !user) return;
-    const q = query(
-      collection(db, "seasons"),
-      where("ownerId", "==", user.uid),
-    );
+    const q = query(collection(db, "seasons"));
     return onSnapshot(
       q,
       (snap) => {
@@ -71,11 +68,13 @@ export default function StandingsPage() {
 
     setIsLoading(true);
 
-    const q = query(
-      collection(db, "tournaments"),
-      where("ownerId", "==", user.uid),
-      where("seasonId", "==", selectedSeasonId),
-    );
+    const adminUid = process.env.NEXT_PUBLIC_ADMIN_UID;
+    const qTournaments = isAdmin
+      ? query(collection(db, "tournaments"), where("ownerId", "==", user.uid), where("seasonId", "==", selectedSeasonId))
+      : adminUid
+        ? query(collection(db, "tournaments"), where("ownerId", "==", adminUid), where("seasonId", "==", selectedSeasonId))
+        : query(collection(db, "tournaments"), where("isPublic", "==", true), where("seasonId", "==", selectedSeasonId));
+    const q = qTournaments;
 
     const unsub = onSnapshot(
       q,
@@ -175,7 +174,7 @@ export default function StandingsPage() {
     );
 
     return () => unsub();
-  }, [user, isAuthReady, selectedSeasonId]);
+  }, [user, isAuthReady, isAdmin, selectedSeasonId]);
 
   if (!isAuthReady || !user) {
     return (

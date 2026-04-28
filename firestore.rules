@@ -33,6 +33,11 @@ service cloud.firestore {
           request.auth.uid == 'xV97IDspMmYcUkXvPP1eOlJD3KI2');
     }
 
+    // Inhalte, die dem SuperAdmin gehören, sind für alle eingeloggten User lesbar
+    function isOwnedBySuperAdmin() {
+      return resource.data.ownerId == 'xV97IDspMmYcUkXvPP1eOlJD3KI2';
+    }
+
     function isAdmin() {
       return isAuthenticated() &&
         (isSuperAdmin() ||
@@ -159,8 +164,8 @@ service cloud.firestore {
     // Rules
     // ===============================================================
     match /seasons/{seasonId} {
-      allow read: if isOwner(resource.data.ownerId) || isAdmin();
-      allow create: if isAuthenticated() && isValidSeason(request.resource.data);
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidSeason(request.resource.data);
       allow update: if (isOwner(resource.data.ownerId) || isAdmin()) && isValidSeason(request.resource.data);
       allow delete: if isOwner(resource.data.ownerId) || isAdmin();
     }
@@ -239,15 +244,31 @@ service cloud.firestore {
     }
 
     match /tournaments/{tournamentId} {
-      allow read: if isOwner(resource.data.ownerId) || isAdmin() ||
-        (isAuthenticated() && resource.data.participantUids is list &&
-         resource.data.participantUids.hasAny([request.auth.uid]));
-      allow create: if isAuthenticated() && isValidTournament(request.resource.data);
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.ownerId) ||
+        isAdmin() ||
+        resource.data.isPublic == true ||
+        isOwnedBySuperAdmin() ||
+        (resource.data.participantUids is list &&
+         resource.data.participantUids.hasAny([request.auth.uid]))
+      );
+      // Nur Admins dürfen reguläre Turniere erstellen; alle eingeloggten User dürfen freie Spiele erstellen
+      allow create: if isAuthenticated() && isValidTournament(request.resource.data) && (
+        isAdmin() ||
+        request.resource.data.type in ['single_match', 'casual_tiebreak']
+      );
       allow update: if (isOwner(resource.data.ownerId) || isAdmin()) && isValidTournament(request.resource.data);
       allow delete: if isOwner(resource.data.ownerId) || isAdmin();
 
       match /players/{playerId} {
-        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();
+        allow read: if isAuthenticated() && (
+          isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) ||
+          isAdmin() ||
+          get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.isPublic == true ||
+          get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId == 'xV97IDspMmYcUkXvPP1eOlJD3KI2' ||
+          (get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.participantUids is list &&
+           get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.participantUids.hasAny([request.auth.uid]))
+        );
         allow create: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidPlayer(request.resource.data);
         allow update: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidPlayer(request.resource.data);
         allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();
@@ -266,7 +287,14 @@ service cloud.firestore {
       }
 
       match /tiebreaks/{tiebreakId} {
-        allow read: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();
+        allow read: if isAuthenticated() && (
+          isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) ||
+          isAdmin() ||
+          get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.isPublic == true ||
+          get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId == 'xV97IDspMmYcUkXvPP1eOlJD3KI2' ||
+          (get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.participantUids is list &&
+           get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.participantUids.hasAny([request.auth.uid]))
+        );
         allow create: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidTiebreak(request.resource.data);
         allow update: if (isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin()) && isValidTiebreak(request.resource.data);
         allow delete: if isOwner(get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.ownerId) || isAdmin();

@@ -74,31 +74,49 @@ export default function CasualGamesPage() {
   useEffect(() => {
     if (!isAuthReady || !user) return;
 
-    const q = query(
-      collection(db, "tournaments"),
-      where("ownerId", "==", user.uid),
-    );
-    const unsubscribeTournaments = onSnapshot(
-      q,
+    const mergeAndSet = (ownDocs: any[], publicDocs: any[]) => {
+      const seen = new Set<string>();
+      const merged: any[] = [];
+      for (const d of [...ownDocs, ...publicDocs]) {
+        if (!seen.has(d.id)) {
+          seen.add(d.id);
+          merged.push(d);
+        }
+      }
+      merged.sort((a: any, b: any) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+      setCasualGames(
+        merged.filter((d) => d.type === "single_match" || d.type === "casual_tiebreak"),
+      );
+    };
+
+    let ownDocs: any[] = [];
+    let publicDocs: any[] = [];
+
+    const qOwn = query(collection(db, "tournaments"), where("ownerId", "==", user.uid));
+    const qPublic = query(collection(db, "tournaments"), where("isPublic", "==", true));
+
+    const unsubOwn = onSnapshot(
+      qOwn,
       (snapshot) => {
-        const allDocs = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as any),
-        }));
-        allDocs.sort((a: any, b: any) => {
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return timeB - timeA;
-        });
-        const c = allDocs.filter(
-          (d) => d.type === "single_match" || d.type === "casual_tiebreak",
-        );
-        setCasualGames(c);
+        ownDocs = snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+        mergeAndSet(ownDocs, publicDocs);
       },
-      (error) => {
-        handleFirestoreError(error, OperationType.LIST, "tournaments");
-      },
+      (error) => handleFirestoreError(error, OperationType.LIST, "tournaments"),
     );
+    const unsubPublic = onSnapshot(
+      qPublic,
+      (snapshot) => {
+        publicDocs = snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+        mergeAndSet(ownDocs, publicDocs);
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, "tournaments"),
+    );
+
+    const unsubscribeTournaments = () => { unsubOwn(); unsubPublic(); };
 
     const qPlayers = collection(db, "players");
     const unsubscribePlayers = onSnapshot(
@@ -188,6 +206,11 @@ export default function CasualGamesPage() {
 
         if (!p1 || (!isVsAI && !p2)) return;
 
+        const participantUids = [user.uid];
+        if (!isVsAI && p2?.authUid && p2.authUid !== user.uid) {
+          participantUids.push(p2.authUid);
+        }
+
         const docRef = await addDoc(collection(db, "tournaments"), {
           title: `Single Match: ${p1.name} vs ${p2Name}`,
           status: "single_match",
@@ -198,6 +221,7 @@ export default function CasualGamesPage() {
           createdAt: new Date().toISOString(),
           ownerId: user.uid,
           isPublic: isVsAI ? false : isPublicGame,
+          participantUids,
           ...(isVsAI ? { aiDifficulty, isVsAI: true } : {}),
         });
 
@@ -770,19 +794,25 @@ export default function CasualGamesPage() {
                   <>
                     <div className="grid gap-2">
                       <Label>Spieler 1</Label>
-                      <select
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        value={player1Id}
-                        onChange={(e) => setPlayer1Id(e.target.value)}
-                      >
-                        <option value="">Spieler 1 wählen</option>
-                        {players.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                            {p.nickname ? ` (${p.nickname})` : ""}
-                          </option>
-                        ))}
-                      </select>
+                      {isAdmin ? (
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          value={player1Id}
+                          onChange={(e) => setPlayer1Id(e.target.value)}
+                        >
+                          <option value="">Spieler 1 wählen</option>
+                          {players.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                              {p.nickname ? ` (${p.nickname})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="flex h-10 w-full items-center rounded-md border border-input bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300">
+                          {players.find((p) => p.id === player1Id)?.name || "Kein Spielerprofil verknüpft"}
+                        </div>
+                      )}
                     </div>
                     {/* KI-Toggle */}
                     <div className="flex items-center gap-3 py-1">

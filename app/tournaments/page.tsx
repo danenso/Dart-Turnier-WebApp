@@ -108,12 +108,16 @@ export default function TournamentsPage() {
       (error) => handleFirestoreError(error, OperationType.LIST, "seasons"),
     );
 
-    const q = query(
-      collection(db, "tournaments"),
-      where("ownerId", "==", user.uid),
-    );
+    const adminUid = process.env.NEXT_PUBLIC_ADMIN_UID;
+    // Admins sehen ihre eigenen Turniere; reguläre User sehen Admin-Turniere + öffentliche Turniere
+    const qTournaments = isAdmin
+      ? query(collection(db, "tournaments"), where("ownerId", "==", user.uid))
+      : adminUid
+        ? query(collection(db, "tournaments"), where("ownerId", "==", adminUid))
+        : query(collection(db, "tournaments"), where("isPublic", "==", true));
+
     const unsubscribeTournaments = onSnapshot(
-      q,
+      qTournaments,
       (snapshot) => {
         const allDocs = snapshot.docs.map((d) => ({
           id: d.id,
@@ -237,6 +241,7 @@ export default function TournamentsPage() {
         numberOfBoards,
         createdAt: new Date().toISOString(),
         ownerId: user.uid,
+        isPublic: true,
       };
       if (selectedSeasonId) data.seasonId = selectedSeasonId;
       if (isFinalTournament) {
@@ -299,7 +304,7 @@ export default function TournamentsPage() {
                 <List className="w-4 h-4" />
               </button>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
+            {isAdmin && <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
               <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
                 Neues Turnier
               </Button>
@@ -630,7 +635,7 @@ export default function TournamentsPage() {
                   </Button>
                 </DialogFooter>
               </DialogContent>
-            </Dialog>
+            </Dialog>}
           </div>
         </div>
 
