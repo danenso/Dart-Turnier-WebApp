@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
 import { slugify } from '@/lib/slugify';
 import { fetchPlayerMatches, calculateStats, getAchievements, MatchStats, PlayerStats, GameType, EarnedAchievement } from '@/lib/playerStats';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query } from 'firebase/firestore';
 import { Icon } from '@iconify/react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -47,9 +47,7 @@ export default function PlayerStatsPage() {
   // Load player profile
   useEffect(() => {
     if (!isAuthReady || !user) return;
-    const q = isAdmin
-      ? query(collection(db, 'players'), where('ownerId', '==', user.uid))
-      : query(collection(db, 'players'), where('authUid', '==', user.uid));
+    const q = query(collection(db, 'players'));
 
     getDocs(q)
       .then((snap) => {
