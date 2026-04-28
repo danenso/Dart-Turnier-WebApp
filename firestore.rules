@@ -178,7 +178,7 @@ service cloud.firestore {
     match /players/{playerId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidGlobalPlayer(request.resource.data);
-      allow update: if (isOwner(resource.data.ownerId) || isAdmin()) && isValidGlobalPlayerUpdate(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
+      allow update: if (isOwner(resource.data.ownerId) || isAdmin() || (isAuthenticated() && resource.data.authUid == request.auth.uid)) && isValidGlobalPlayerUpdate(request.resource.data) && request.resource.data.ownerId == resource.data.ownerId;
       allow delete: if isOwner(resource.data.ownerId);
     }
 

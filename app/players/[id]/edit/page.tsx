@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { db, secondaryAuth } from "@/lib/firebase";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-errors";
 import { processAvatarToBase64, AvatarUploadError } from "@/lib/avatar-upload";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, updatePassword, updateEmail } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, updateDoc, deleteDoc, setDoc, where } from "firebase/firestore";
 import {
   Dialog,
@@ -43,6 +43,8 @@ export default function PlayerEditPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPlayerAdmin, setIsPlayerAdmin] = useState(false);
   const [emailSendError, setEmailSendError] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [authUpdateError, setAuthUpdateError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Song state
@@ -58,32 +60,38 @@ export default function PlayerEditPage() {
   useEffect(() => {
     if (!isAuthReady || !user) return;
 
-    if (!isAdmin) {
-      router.push("/players");
-      return;
-    }
-
     const fetchPlayer = async () => {
       try {
-        // Slug-basierter Lookup: alle Spieler des Admins laden und per Slug filtern
-        const snap = await getDocs(
-          query(collection(db, "players"), where("ownerId", "==", user.uid))
-        );
-        const found = snap.docs.find(d => slugify(d.data().name) === id);
-        if (found) {
-          const data = found.data();
-          setPlayer({ id: found.id, ...data });
-          setName(data.name || "");
-          setNickname(data.nickname || "");
-          setEmail(data.email || "");
-          setAvatar(data.avatar || "");
-          setSongUrl(data.songUrl || "");
-          setSongTitle(data.songTitle || "");
-          setSongArtist(data.songArtist || "");
+        let foundDoc: any = null;
 
-          // Admin-Status laden falls authUid vorhanden
-          if (data.authUid && isSuperAdmin) {
-            const userDoc = await getDoc(doc(db, "users", data.authUid));
+        if (isAdmin) {
+          // Admin: sucht eigene Spieler per ownerId
+          const snap = await getDocs(
+            query(collection(db, "players"), where("ownerId", "==", user.uid))
+          );
+          const match = snap.docs.find(d => slugify(d.data().name) === id);
+          if (match) foundDoc = { id: match.id, ...match.data() };
+        } else {
+          // Normaler User: sucht eigenen Spieler per authUid
+          const snap = await getDocs(
+            query(collection(db, "players"), where("authUid", "==", user.uid))
+          );
+          const match = snap.docs.find(d => slugify(d.data().name) === id);
+          if (match) foundDoc = { id: match.id, ...match.data() };
+        }
+
+        if (foundDoc) {
+          setPlayer(foundDoc);
+          setName(foundDoc.name || "");
+          setNickname(foundDoc.nickname || "");
+          setEmail(foundDoc.email || user.email || "");
+          setAvatar(foundDoc.avatar || "");
+          setSongUrl(foundDoc.songUrl || "");
+          setSongTitle(foundDoc.songTitle || "");
+          setSongArtist(foundDoc.songArtist || "");
+
+          if (foundDoc.authUid && isSuperAdmin) {
+            const userDoc = await getDoc(doc(db, "users", foundDoc.authUid));
             setIsPlayerAdmin(userDoc.exists() && userDoc.data().role === "admin");
           }
         } else {
@@ -115,9 +123,12 @@ export default function PlayerEditPage() {
     setAvatarPreview(URL.createObjectURL(file));
   };
 
+  const isSelfEditing = !isAdmin && player?.authUid === user?.uid;
+
   const handleSave = async () => {
     if (!player) return;
     setIsSaving(true);
+    setAuthUpdateError("");
 
     try {
       let authUid = player.authUid;
@@ -208,6 +219,33 @@ export default function PlayerEditPage() {
           role: isPlayerAdmin ? "admin" : "user",
           email: email || player.email || "",
         }, { merge: true });
+      }
+
+      // Selbstbearbeitung: E-Mail und Passwort via Firebase Auth ändern
+      if (isSelfEditing && user) {
+        if (email && email !== user.email) {
+          try {
+            await updateEmail(user, email);
+          } catch (err: any) {
+            const msg = err.code === "auth/requires-recent-login"
+              ? "Bitte neu einloggen um die E-Mail zu ändern."
+              : "E-Mail konnte nicht geändert werden.";
+            setAuthUpdateError(msg);
+          }
+        }
+        if (newPassword) {
+          try {
+            await updatePassword(user, newPassword);
+            setNewPassword("");
+          } catch (err: any) {
+            const msg = err.code === "auth/requires-recent-login"
+              ? "Bitte neu einloggen um das Passwort zu ändern."
+              : "Passwort konnte nicht geändert werden.";
+            setAuthUpdateError((prev) => prev ? `${prev} ${msg}` : msg);
+          }
+        }
+        router.push("/players");
+        return;
       }
 
       if (invitationSent) {
@@ -446,6 +484,38 @@ export default function PlayerEditPage() {
                 </div>
               )}
             </div>
+
+            {isSelfEditing && (
+              <div className="pt-6 mt-6 border-t border-zinc-200 dark:border-zinc-700">
+                <h4 className="font-medium mb-4">Zugangsdaten</h4>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="self-email">E-Mail-Adresse</Label>
+                    <Input
+                      id="self-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="self-password">Neues Passwort</Label>
+                    <Input
+                      id="self-password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="new-password"
+                      placeholder="Leer lassen um nicht zu ändern"
+                    />
+                  </div>
+                  {authUpdateError && (
+                    <p className="text-sm text-red-500">{authUpdateError}</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {isAdmin && (
               <div className="pt-6 mt-6 border-t border-zinc-200">

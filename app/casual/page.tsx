@@ -100,10 +100,7 @@ export default function CasualGamesPage() {
       },
     );
 
-    const qPlayers = query(
-      collection(db, "players"),
-      where("ownerId", "==", user.uid),
-    );
+    const qPlayers = collection(db, "players");
     const unsubscribePlayers = onSnapshot(
       qPlayers,
       (snapshot) => {
@@ -120,6 +117,13 @@ export default function CasualGamesPage() {
       unsubscribePlayers();
     };
   }, [user, isAuthReady]);
+
+  // Eingeloggten Spieler automatisch als Spieler 1 vorauswählen
+  useEffect(() => {
+    if (!user || players.length === 0 || player1Id) return;
+    const myPlayer = players.find((p: any) => p.authUid === user.uid);
+    if (myPlayer) setPlayer1Id(myPlayer.id);
+  }, [players, user]);
 
   // Real-time subscription to match/tiebreak data for each game
   useEffect(() => {
