@@ -155,7 +155,7 @@ export function generateAITurn(
 
 export const AI_DIFFICULTY_LABELS: Record<AIDifficulty, string> = {
   easy:   "Anfänger",
-  medium: "Fortgeschrittener",
+  medium: "Mittel",
   hard:   "Profi",
 };
 

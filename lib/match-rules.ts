@@ -5,28 +5,20 @@ export interface DrawRule {
 
 export const DEFAULT_DRAW_RULE: DrawRule = { enabled: false };
 
-// Wer beginnt?
+// Wer beginnt Leg 1?
 export type MatchStartRule =
-  | 'bull-throw'    // 1 Pfeil auf Bull, näher dran beginnt
-  | 'coin-flip'     // Münzwurf (App entscheidet zufällig)
-  | 'manual'        // Veranstalter wählt manuell
-  | 'winner-starts' // Leg-Sieger beginnt nächstes Leg
-  | 'loser-starts'; // Leg-Verlierer beginnt nächstes Leg (PDC-Standard)
+  | 'manual'       // Spieler wählen aus
+  | 'bull-throw';  // 1 Pfeil auf Bull, näher dran beginnt
 
 export interface MatchStartConfig {
   firstLeg: MatchStartRule;
-  subsequentLegs: MatchStartRule;
 }
 
 export const DEFAULT_MATCH_START: MatchStartConfig = {
-  firstLeg: 'bull-throw',
-  subsequentLegs: 'loser-starts',
+  firstLeg: 'manual',
 };
 
 export const MATCH_START_LABELS: Record<MatchStartRule, string> = {
-  'bull-throw':    'Bull-Wurf (1 Pfeil, näher = Anfang)',
-  'coin-flip':     'Münzwurf (App entscheidet zufällig)',
-  'manual':        'Veranstalter legt fest',
-  'winner-starts': 'Sieger des Legs beginnt',
-  'loser-starts':  'Verlierer des Legs beginnt (PDC)',
+  'manual':     'Spieler wählen aus',
+  'bull-throw': 'Bull-Wurf (1 Pfeil, näher = Anfang)',
 };

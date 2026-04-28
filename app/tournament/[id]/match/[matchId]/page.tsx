@@ -56,7 +56,6 @@ export default function MatchPage() {
   const [aiThinking, setAiThinking] = useState(false);
   const [profilesLoaded, setProfilesLoaded] = useState(false);
   const [dartboardMode, setDartboardMode] = useState(false);
-  const [coinFlipResult, setCoinFlipResult] = useState<'A' | 'B' | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const submitTurnRef = useRef<typeof submitTurn | null>(null);
   const aiThinkingRef = useRef(false);
@@ -230,14 +229,6 @@ export default function MatchPage() {
     }
   };
 
-  const handleCoinFlip = () => {
-    const result: 'A' | 'B' = Math.random() < 0.5 ? 'A' : 'B';
-    setCoinFlipResult(result);
-    setTimeout(() => {
-      setStarter(result === 'A' ? match.playerAId : match.playerBId);
-      setCoinFlipResult(null);
-    }, 2000);
-  };
 
   const handleDartInput = async (baseValue: number) => {
     if (baseValue === 25 && multiplier === "triple") {
@@ -544,20 +535,8 @@ export default function MatchPage() {
         updates.playerBLegs = newPlayerBLegs;
         updates.currentLeg = (match.currentLeg || 1) + 1;
 
-        // Determine who starts the next leg based on matchStartConfig
-        // If matchStartConfig is absent (legacy tournament), preserve alternating behavior
-        const subsequentLegsRule = tournament?.matchStartConfig?.subsequentLegs;
-        const didPlayerAWinLeg = winnerId === match.playerAId;
-        let nextStarterIsA: boolean;
-        if (!subsequentLegsRule) {
-          nextStarterIsA = !match.playerAStartsLeg; // legacy: alternating
-        } else {
-          switch (subsequentLegsRule) {
-            case 'winner-starts': nextStarterIsA = didPlayerAWinLeg; break;
-            case 'loser-starts':  nextStarterIsA = !didPlayerAWinLeg; break;
-            default:              nextStarterIsA = !match.playerAStartsLeg;
-          }
-        }
+        // Folge-Legs: immer alternieren
+        const nextStarterIsA = !match.playerAStartsLeg;
 
         updates.playerAStartsLeg = nextStarterIsA;
         updates.currentTurnId = nextStarterIsA
@@ -674,7 +653,6 @@ export default function MatchPage() {
       : tournament?.name ?? "Turnier";
     const isVsAI = tournament?.isVsAI === true;
     const matchStartConfig: MatchStartConfig = tournament?.matchStartConfig ?? DEFAULT_MATCH_START;
-    const isCoinFlipMode = matchStartConfig.firstLeg === 'coin-flip' && !isVsAI;
     const isBullThrowMode = matchStartConfig.firstLeg === 'bull-throw' && !isVsAI;
 
     const renderPlayerCard = (isA: boolean) => {
@@ -719,10 +697,10 @@ export default function MatchPage() {
             </p>
           )}
 
-          {/* Name als Button — in Münzwurf- oder Bull-Throw-Modus deaktiviert */}
+          {/* Name als Button — im Bull-Throw-Modus deaktiviert */}
           <button
-            onClick={() => (canInput && !isCoinFlipMode && !isBullThrowMode) ? (isBot ? setStarter(match.playerAId) : setStarter(playerId)) : undefined}
-            disabled={!canInput || isCoinFlipMode || isBullThrowMode}
+            onClick={() => (canInput && !isBullThrowMode) ? (isBot ? setStarter(match.playerAId) : setStarter(playerId)) : undefined}
+            disabled={!canInput || isBullThrowMode}
             className={`group relative w-full px-6 py-3 md:px-8 md:py-4 rounded-xl font-bold text-base md:text-lg
               transition-all duration-200 shadow-lg focus:outline-none
               ${!canInput ? "opacity-40 cursor-not-allowed" : "active:scale-95"}
@@ -788,11 +766,7 @@ export default function MatchPage() {
             </div>
           </div>
 
-          {isCoinFlipMode ? (
-            <p className="text-center text-zinc-500 dark:text-zinc-400 text-sm md:text-base mt-1 match-fade-down" style={{ animationDelay: "0.05s" }}>
-              Münzwurf entscheidet wer beginnt
-            </p>
-          ) : isBullThrowMode ? (
+          {isBullThrowMode ? (
             <div className="text-center mt-1 match-fade-down" style={{ animationDelay: "0.05s" }}>
               <p className="text-zinc-900 dark:text-zinc-100 text-base md:text-lg font-semibold">
                 🎯 Bullwurf — wer beginnt Leg 1?
@@ -830,28 +804,11 @@ export default function MatchPage() {
             </div>
           </div>
 
-          {/* Bottom: Venue / Dartboard toggle / Coin-flip */}
+          {/* Bottom: Venue / Dartboard toggle */}
           <div className="flex flex-col items-center gap-3 pb-6 pt-2 match-fade-up">
             <div className="px-5 py-1.5 rounded-full bg-zinc-900/5 border border-zinc-900/8 dark:bg-white/5 dark:border-white/10 text-zinc-500 dark:text-zinc-500 text-xs font-medium tracking-widest uppercase">
               {venueLabel}
             </div>
-            {isCoinFlipMode && canInput && (
-              coinFlipResult ? (
-                <div className="flex flex-col items-center gap-1">
-                  <div className="text-4xl animate-bounce">🪙</div>
-                  <p className="text-base font-bold text-zinc-800 dark:text-white">
-                    {coinFlipResult === 'A' ? match.playerAName : match.playerBName} beginnt!
-                  </p>
-                </div>
-              ) : (
-                <button
-                  onClick={handleCoinFlip}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-amber-500/10 border border-amber-400/40 text-amber-700 dark:text-amber-300 text-sm font-medium hover:bg-amber-500/20 transition-colors"
-                >
-                  🪙 Münzwurf starten
-                </button>
-              )
-            )}
             {isBullThrowMode && canInput && (
               <button
                 onClick={() => setDartboardMode(true)}
@@ -861,7 +818,7 @@ export default function MatchPage() {
                 Dartscheibe öffnen
               </button>
             )}
-            {!isCoinFlipMode && !isBullThrowMode && canInput && !isVsAI && (
+            {!isBullThrowMode && canInput && !isVsAI && (
               <button
                 onClick={() => setDartboardMode(!dartboardMode)}
                 className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
