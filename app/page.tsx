@@ -71,6 +71,10 @@ export default function Home() {
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (honeypot || Date.now() - formLoadTime.current < 1500) return;
+    if (!loginEmail || !loginPassword) {
+      setLoginError("Bitte E-Mail und Passwort eingeben.");
+      return;
+    }
     setLoginError("");
     setIsLoggingIn(true);
     try {
