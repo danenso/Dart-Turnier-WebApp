@@ -48,10 +48,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Load liga list for sidebar
   useEffect(() => {
     if (!user) return;
-    // Admins sehen nur ihre eigenen Ligen; Regular User sehen alle (Firestore-Regel erlaubt isAuthenticated())
-    const q = isAdmin
-      ? query(collection(db, "liga"), where("ownerId", "==", user.uid))
-      : query(collection(db, "liga"));
+    const q = query(collection(db, "liga"));
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs
         .map((d) => ({ id: d.id, name: d.data().name, abbreviation: d.data().abbreviation, themeColor: d.data().themeColor }))
@@ -59,7 +56,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       setLigen(docs);
     });
     return () => unsub();
-  }, [user, isAdmin]);
+  }, [user]);
 
   if (!isAuthReady) {
     return (

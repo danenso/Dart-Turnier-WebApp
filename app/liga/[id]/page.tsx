@@ -197,11 +197,7 @@ export default function LigaDetailPage() {
       (snap) => {
         if (snap.exists()) {
           const data = { id: snap.id, ...(snap.data() as any) } as LigaDoc;
-          // Admins müssen Owner sein; Regular User dürfen alle Ligen lesen
-          if (isAdmin && data.ownerId !== user.uid) {
-            router.push("/liga");
-            return;
-          }
+          // Kein Ownership-Check – Admins und User dürfen alle Ligen lesen
           setLiga(data);
         } else {
           router.push("/liga");
@@ -251,7 +247,7 @@ export default function LigaDetailPage() {
   // Players
   useEffect(() => {
     if (!user || !isAuthReady) return;
-    const q = query(collection(db, "players"), where("ownerId", "==", user.uid));
+    const q = query(collection(db, "players"));
     const unsub = onSnapshot(q, (snap) => {
       setPlayers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
@@ -261,7 +257,7 @@ export default function LigaDetailPage() {
   // Tournaments
   useEffect(() => {
     if (!user || !isAuthReady) return;
-    const q = query(collection(db, "tournaments"), where("ownerId", "==", user.uid));
+    const q = query(collection(db, "tournaments"));
     const unsub = onSnapshot(q, (snap) => {
       const all = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as any) }))

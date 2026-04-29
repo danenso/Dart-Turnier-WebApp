@@ -63,9 +63,7 @@ export default function LigaOverviewPage() {
   // Load all ligen for this user
   useEffect(() => {
     if (!isAuthReady || !user) return;
-    const q = isAdmin
-      ? query(collection(db, "liga"), where("ownerId", "==", user.uid))
-      : query(collection(db, "liga"));
+    const q = query(collection(db, "liga"));
     const unsub = onSnapshot(
       q,
       async (snap) => {

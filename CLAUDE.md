@@ -60,9 +60,10 @@ public/           # Statische Assets
 ## Rollen & Berechtigungen
 
 - **SuperAdmin**: `hello@danenso.com` / UID `xV97IDspMmYcUkXvPP1eOlJD3KI2` (hardcoded in Rules + FirebaseProvider)
-- **Admin**: `users/{uid}.role == 'admin'` in Firestore
+- **Admin**: `users/{uid}.role == 'admin'` – kann alles wie SuperAdmin, außer Admin-Rechte vergeben
 - **User**: Eingeladener Regular User (`users/{uid}.role == 'user'`)
 - Rolle immer aus `useFirebase()` holen: `const { isAdmin, isSuperAdmin } = useFirebase();`
+- **Admin sieht ALLES** – alle Ligen, Turniere, Seasons, Spieler (keine ownerId-Filter für Admins!)
 
 ## Firestore-Zugriffsmuster
 

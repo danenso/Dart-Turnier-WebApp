@@ -43,10 +43,7 @@ export default function SeasonsPage() {
 
   useEffect(() => {
     if (!isAuthReady || !user) return;
-    const q = query(
-      collection(db, "seasons"),
-      where("ownerId", "==", user.uid),
-    );
+    const q = query(collection(db, "seasons"));
     return onSnapshot(
       q,
       (snap) => {

@@ -159,10 +159,7 @@ export default function TournamentPage() {
         ),
     );
 
-    const q = query(
-      collection(db, "players"),
-      where("ownerId", "==", user.uid),
-    );
+    const q = query(collection(db, "players"));
     const gUnsub = onSnapshot(
       q,
       (snapshot) => {

@@ -94,10 +94,7 @@ export default function TournamentsPage() {
   useEffect(() => {
     if (!isAuthReady || !user) return;
 
-    const qSeasons = query(
-      collection(db, "seasons"),
-      where("ownerId", "==", user.uid),
-    );
+    const qSeasons = query(collection(db, "seasons"));
     const unsubscribeSeasons = onSnapshot(
       qSeasons,
       (snap) => {
@@ -109,9 +106,9 @@ export default function TournamentsPage() {
     );
 
     const adminUid = process.env.NEXT_PUBLIC_ADMIN_UID;
-    // Admins sehen ihre eigenen Turniere; reguläre User sehen Admin-Turniere + öffentliche Turniere
+    // Admins sehen alle Turniere; reguläre User sehen Admin-Turniere + öffentliche Turniere
     const qTournaments = isAdmin
-      ? query(collection(db, "tournaments"), where("ownerId", "==", user.uid))
+      ? query(collection(db, "tournaments"))
       : adminUid
         ? query(collection(db, "tournaments"), where("ownerId", "==", adminUid))
         : query(collection(db, "tournaments"), where("isPublic", "==", true));

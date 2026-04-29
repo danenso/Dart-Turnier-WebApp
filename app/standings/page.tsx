@@ -69,12 +69,11 @@ export default function StandingsPage() {
     setIsLoading(true);
 
     const adminUid = process.env.NEXT_PUBLIC_ADMIN_UID;
-    const qTournaments = isAdmin
-      ? query(collection(db, "tournaments"), where("ownerId", "==", user.uid), where("seasonId", "==", selectedSeasonId))
+    const q = isAdmin
+      ? query(collection(db, "tournaments"), where("seasonId", "==", selectedSeasonId))
       : adminUid
         ? query(collection(db, "tournaments"), where("ownerId", "==", adminUid), where("seasonId", "==", selectedSeasonId))
         : query(collection(db, "tournaments"), where("isPublic", "==", true), where("seasonId", "==", selectedSeasonId));
-    const q = qTournaments;
 
     const unsub = onSnapshot(
       q,
