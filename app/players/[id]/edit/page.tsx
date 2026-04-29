@@ -65,10 +65,8 @@ export default function PlayerEditPage() {
         let foundDoc: any = null;
 
         if (isAdmin) {
-          // Admin: sucht eigene Spieler per ownerId
-          const snap = await getDocs(
-            query(collection(db, "players"), where("ownerId", "==", user.uid))
-          );
+          // Admin: alle Spieler durchsuchen
+          const snap = await getDocs(query(collection(db, "players")));
           const match = snap.docs.find(d => slugify(d.data().name) === id);
           if (match) foundDoc = { id: match.id, ...match.data() };
         } else {

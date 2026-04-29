@@ -84,6 +84,7 @@ public/           # Statische Assets
 - Liga-Detail Redirect: `app/liga/[id]/page.tsx` ~Zeile 201 – prüft Owner-Zugriff
 - Sidebar-Liga-Query: `components/AppLayout.tsx` ~Zeile 51 – muss `isAdmin` berücksichtigen
 - Spieler-Statistiken: `app/players/[id]/page.tsx` – Query muss alle Spieler laden, nicht nur eigene
+- Spieler bearbeiten: `app/players/[id]/edit/page.tsx` – Admin-Query muss alle Spieler laden, nicht nur eigene
 - Spieler-Stats leer: `lib/playerStats.ts` `fetchPlayerMatches` – Tournament-Docs per `Promise.allSettled` laden (nicht `Promise.all`), sonst bricht ein Permission-Fehler alles ab
 - Firestore-Query ohne passende Rule → silenter Fehler oder leeres Ergebnis
 - `isAdmin` ist asynchron (Firestore-Fetch) → immer in useEffect-Dependencies aufnehmen
