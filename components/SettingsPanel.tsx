@@ -41,8 +41,9 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { storage } from "@/lib/firebase";
+import { storage, db } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, collectionGroup, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { useFirebase } from "@/components/FirebaseProvider";
 import { InvitationManager } from "@/components/InvitationManager";
 
@@ -128,6 +129,8 @@ export function SettingsPanel() {
   const [mounted, setMounted] = useState(false);
   const [iconSearch, setIconSearch] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [cleanupStatus, setCleanupStatus] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [cleanupLog, setCleanupLog] = useState("");
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -456,6 +459,68 @@ export function SettingsPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ─── Daten-Bereinigung (nur SuperAdmin) ─── */}
+      {isSuperAdmin && (
+        <Card className="border-red-200 dark:border-red-900">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <Icon icon="mdi:refresh" className="w-5 h-5" />
+              Statistiken zurücksetzen
+            </CardTitle>
+            <CardDescription>
+              Setzt alle Spieler-Statistiken, Ränge und Achievements auf 0 zurück — für einen Neustart.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-400">
+              ⚠ Diese Aktion ist nicht rückgängig machbar. Match-Historie und Achievements werden auf 0 zurückgesetzt.
+            </div>
+            <Button
+              variant="destructive"
+              disabled={cleanupStatus === "running"}
+              onClick={async () => {
+                if (!confirm("Wirklich alle Statistiken zurücksetzen? Alle Match-Daten und Achievements werden auf 0 gesetzt.")) return;
+                setCleanupStatus("running");
+                setCleanupLog("Starte Bereinigung...");
+                try {
+                  // 1. Alle Spieler-Dokumente: earnedAchievements leeren
+                  const playersSnap = await getDocs(collection(db, "players"));
+                  let playerCount = 0;
+                  for (const playerDoc of playersSnap.docs) {
+                    const data = playerDoc.data();
+                    if (data.earnedAchievements?.length) {
+                      await updateDoc(doc(db, "players", playerDoc.id), { earnedAchievements: [] });
+                      playerCount++;
+                    }
+                  }
+                  setCleanupLog(`✓ ${playerCount} Spieler-Achievements geleert.\nLösche verwaiste Match-Dokumente...`);
+
+                  // 2. Verwaiste matches-Subcollection löschen
+                  const matchesSnap = await getDocs(collectionGroup(db, "matches"));
+                  let matchCount = 0;
+                  for (const matchDoc of matchesSnap.docs) {
+                    await deleteDoc(matchDoc.ref);
+                    matchCount++;
+                  }
+                  setCleanupLog(`✓ ${playerCount} Spieler-Achievements geleert.\n✓ ${matchCount} verwaiste Match-Dokumente gelöscht.\n\nBereinigung abgeschlossen.`);
+                  setCleanupStatus("done");
+                } catch (err: any) {
+                  setCleanupLog(`Fehler: ${err?.message ?? "Unbekannter Fehler"}`);
+                  setCleanupStatus("error");
+                }
+              }}
+            >
+              {cleanupStatus === "running" ? "Wird zurückgesetzt..." : "Statistiken auf 0 zurücksetzen"}
+            </Button>
+            {cleanupLog && (
+              <pre className="text-xs bg-zinc-100 dark:bg-zinc-900 rounded p-3 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+                {cleanupLog}
+              </pre>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ─── Language ─── */}
       <Card>
