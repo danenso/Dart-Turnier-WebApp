@@ -25,6 +25,7 @@ export interface LeagueAchievementDef {
 // ─────────────────────────────────────────────────────────────
 
 export const LEAGUE_ACHIEVEMENTS: LeagueAchievementDef[] = [
+  // ── Turniersieg ──
   {
     id: 'matchday-winner',
     name: 'Tagessieg',
@@ -33,6 +34,81 @@ export const LEAGUE_ACHIEVEMENTS: LeagueAchievementDef[] = [
     tier: 'special',
     stackable: true,
   },
+  {
+    id: 'first-tournament-win',
+    name: 'Erster Turniersieg',
+    description: 'Zum ersten Mal ein Turnier gewonnen',
+    icon: 'mdi:trophy-award',
+    tier: 'bronze',
+    stackable: false,
+  },
+  {
+    id: 'wins-3-tournaments',
+    name: 'Dreifach-Champion',
+    description: '3 Turniere insgesamt gewonnen',
+    icon: 'mdi:trophy-variant',
+    tier: 'silver',
+    stackable: false,
+  },
+  {
+    id: 'wins-5-tournaments',
+    name: 'Turnier-Legende',
+    description: '5 Turniere insgesamt gewonnen',
+    icon: 'mdi:crown-outline',
+    tier: 'gold',
+    stackable: false,
+  },
+  {
+    id: 'wins-10-tournaments',
+    name: 'Weltmeister',
+    description: '10 Turniere insgesamt gewonnen',
+    icon: 'mdi:crown-circle',
+    tier: 'special',
+    stackable: false,
+  },
+  // ── Turnier-Performance ──
+  {
+    id: 'tournament-unbeaten',
+    name: 'Ungeschlagen',
+    description: 'Ein Turnier gewonnen ohne eine einzige Niederlage',
+    icon: 'mdi:shield-star',
+    tier: 'gold',
+    stackable: true,
+  },
+  {
+    id: 'tournament-comeback',
+    name: 'Comeback King',
+    description: 'Ein Turnier gewonnen trotz mindestens einer Niederlage',
+    icon: 'mdi:trending-up',
+    tier: 'silver',
+    stackable: true,
+  },
+  {
+    id: 'tournament-underdog',
+    name: 'Underdog',
+    description: 'Ein Turnier gewonnen trotz mehr Niederlagen als Siegen',
+    icon: 'mdi:arrow-up-bold-circle',
+    tier: 'silver',
+    stackable: true,
+  },
+  // ── Bracket-Platzierungen ──
+  {
+    id: 'tournament-finalist',
+    name: 'Finalist',
+    description: 'Das Finale eines Turniers erreicht',
+    icon: 'mdi:podium-silver',
+    tier: 'bronze',
+    stackable: true,
+  },
+  {
+    id: 'tournament-top4',
+    name: 'Top 4',
+    description: 'Das Halbfinale eines Turniers erreicht',
+    icon: 'mdi:podium-bronze',
+    tier: 'bronze',
+    stackable: true,
+  },
+  // ── Gruppen-Performance ──
   {
     id: 'perfect-group',
     name: 'Perfekte Gruppe',
@@ -49,6 +125,7 @@ export const LEAGUE_ACHIEVEMENTS: LeagueAchievementDef[] = [
     tier: 'gold',
     stackable: false,
   },
+  // ── Season ──
   {
     id: 'iron-man',
     name: 'Iron Man',
@@ -81,6 +158,7 @@ export const LEAGUE_ACHIEVEMENTS: LeagueAchievementDef[] = [
     tier: 'bronze',
     stackable: true,
   },
+  // ── Grand Final ──
   {
     id: 'grand-final-qualified',
     name: 'Grand Final Qualifier',
@@ -145,12 +223,37 @@ async function grantAchievement(
 }
 
 // ─────────────────────────────────────────────────────────────
+// Cumulative Win Milestone Helper
+// ─────────────────────────────────────────────────────────────
+
+async function checkCumulativeWinMilestones(
+  playerId: string,
+  context: Record<string, any>,
+): Promise<void> {
+  try {
+    const snap = await getDoc(doc(db, 'players', playerId));
+    if (!snap.exists()) return;
+    const earned: EarnedAchievement[] = snap.data()?.earnedAchievements ?? [];
+    // Count all tournament wins: regular matchdays + grand final
+    const totalWins = earned.filter(
+      (a) => a.id === 'matchday-winner' || a.id === 'grand-final-champion',
+    ).length;
+
+    if (totalWins >= 1) await grantAchievement(playerId, 'first-tournament-win', context);
+    if (totalWins >= 3) await grantAchievement(playerId, 'wins-3-tournaments', { ...context, totalWins });
+    if (totalWins >= 5) await grantAchievement(playerId, 'wins-5-tournaments', { ...context, totalWins });
+    if (totalWins >= 10) await grantAchievement(playerId, 'wins-10-tournaments', { ...context, totalWins });
+  } catch (_) {
+    // Non-critical
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // Tournament Completion Handler
 // ─────────────────────────────────────────────────────────────
 
 /**
  * Grant achievements when a regular matchday tournament completes.
- * Call this before/after setting status = 'completed'.
  */
 export async function grantTournamentAchievements(
   tournamentId: string,
@@ -186,10 +289,51 @@ export async function grantTournamentAchievements(
     tournamentNumber: tournament.tournamentNumber,
   };
 
-  // Matchday winner (stackable)
+  // ── Matchday winner (stackable) ──
   await grantAchievement(winner.id, 'matchday-winner', { ...baseCtx, placement: 1 });
 
-  // Hat-Trick: check if winner has won the previous 2 consecutive matchdays in this season
+  // ── Cumulative win milestones ──
+  await checkCumulativeWinMilestones(winner.id, baseCtx);
+
+  // ── Winner quality achievements ──
+  if (winner.losses === 0) {
+    // Won without a single defeat
+    await grantAchievement(winner.id, 'tournament-unbeaten', baseCtx);
+  } else {
+    // Won despite at least one loss
+    await grantAchievement(winner.id, 'tournament-comeback', { ...baseCtx, losses: winner.losses });
+    if (winner.losses > winner.wins) {
+      // More losses than wins overall — true underdog
+      await grantAchievement(winner.id, 'tournament-underdog', {
+        ...baseCtx,
+        wins: winner.wins,
+        losses: winner.losses,
+      });
+    }
+  }
+
+  // ── Bracket placement achievements ──
+  const completedMatches = matches.filter((m) => m.status === 'completed' && m.winnerId);
+  const finalMatch = completedMatches.find((m) => m.phase === 'final');
+  const semiMatches = completedMatches.filter((m) => m.phase === 'semi');
+
+  if (finalMatch) {
+    // Runner-up: lost the final
+    const finalistId =
+      finalMatch.winnerId === finalMatch.playerAId
+        ? finalMatch.playerBId
+        : finalMatch.playerAId;
+    await grantAchievement(finalistId, 'tournament-finalist', { ...baseCtx, placement: 2 });
+
+    // Top 4: all semi-finalists
+    for (const semi of semiMatches) {
+      for (const pId of [semi.playerAId, semi.playerBId]) {
+        await grantAchievement(pId, 'tournament-top4', { ...baseCtx, placement: 'top4' });
+      }
+    }
+  }
+
+  // ── Hat-Trick: 3 consecutive matchday wins in this season ──
   if (tournament.tournamentNumber && tournament.tournamentNumber >= 3) {
     try {
       const winnerRef = doc(db, 'players', winner.id);
@@ -200,12 +344,10 @@ export async function grantTournamentAchievements(
         .map((a) => a.context.tournamentNumber as number)
         .filter(Boolean)
         .sort((a, b) => a - b);
-      // Include the current win (just granted via arrayUnion)
       if (!seasonWins.includes(tournament.tournamentNumber)) {
         seasonWins.push(tournament.tournamentNumber);
         seasonWins.sort((a, b) => a - b);
       }
-      // Check for 3 consecutive numbers ending at current
       const cur = tournament.tournamentNumber;
       if (seasonWins.includes(cur - 1) && seasonWins.includes(cur - 2)) {
         await grantAchievement(winner.id, 'matchday-hat-trick', {
@@ -218,7 +360,7 @@ export async function grantTournamentAchievements(
     }
   }
 
-  // Perfect group: won every group match
+  // ── Perfect group: won every group match ──
   const groupMatches = matches.filter(
     (m) => m.phase === 'group' && m.status === 'completed',
   );
@@ -278,6 +420,9 @@ export async function grantGrandFinalAchievements(
 
   await grantAchievement(champion, 'grand-final-champion', { ...ctx, placement: 1 });
   await grantAchievement(finalist, 'grand-final-finalist', { ...ctx, placement: 2 });
+
+  // Cumulative win milestones also count Grand Final wins
+  await checkCumulativeWinMilestones(champion, ctx);
 
   // Semi-final losers → Grand Final Bronze
   const semiMatches = matches.filter(
@@ -344,7 +489,6 @@ export async function grantSeasonAchievements(
       .filter((t) => t.status === 'completed' && !t.isFinalTournament);
 
     if (regularTourns.length >= 3) {
-      // Build participation map: playerId → set of tournament IDs they played in
       const participation = new Map<string, Set<string>>();
       for (const tourn of regularTourns) {
         const playersSnap = await getDocs(collection(db, 'tournaments', tourn.id, 'players'));
@@ -355,7 +499,6 @@ export async function grantSeasonAchievements(
         }
       }
 
-      // Grant to players who played in every regular tournament
       for (const [playerId, tournSet] of participation) {
         if (tournSet.size === regularTourns.length) {
           await grantAchievement(playerId, 'iron-man', {
