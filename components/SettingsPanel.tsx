@@ -484,17 +484,19 @@ export function SettingsPanel() {
                 setCleanupStatus("running");
                 setCleanupLog("Starte Bereinigung...");
                 try {
-                  // 1. Alle Spieler-Dokumente: earnedAchievements leeren
+                  // 1. Alle Spieler-Dokumente: Zähler + Achievements zurücksetzen
                   const playersSnap = await getDocs(collection(db, "players"));
                   let playerCount = 0;
                   for (const playerDoc of playersSnap.docs) {
-                    const data = playerDoc.data();
-                    if (data.earnedAchievements?.length) {
-                      await updateDoc(doc(db, "players", playerDoc.id), { earnedAchievements: [] });
-                      playerCount++;
-                    }
+                    await updateDoc(doc(db, "players", playerDoc.id), {
+                      earnedAchievements: [],
+                      wins: 0,
+                      losses: 0,
+                      matchesPlayed: 0,
+                    });
+                    playerCount++;
                   }
-                  setCleanupLog(`✓ ${playerCount} Spieler-Achievements geleert.\nLösche verwaiste Match-Dokumente...`);
+                  setCleanupLog(`✓ ${playerCount} Spieler zurückgesetzt (Siege, Niederlagen, Spiele, Achievements).\nLösche verwaiste Match-Dokumente...`);
 
                   // 2. Verwaiste matches-Subcollection löschen
                   const matchesSnap = await getDocs(collectionGroup(db, "matches"));
@@ -503,7 +505,7 @@ export function SettingsPanel() {
                     await deleteDoc(matchDoc.ref);
                     matchCount++;
                   }
-                  setCleanupLog(`✓ ${playerCount} Spieler-Achievements geleert.\n✓ ${matchCount} verwaiste Match-Dokumente gelöscht.\n\nBereinigung abgeschlossen.`);
+                  setCleanupLog(`✓ ${playerCount} Spieler zurückgesetzt (Siege, Niederlagen, Spiele, Achievements).\n✓ ${matchCount} verwaiste Match-Dokumente gelöscht.\n\nBereinigung abgeschlossen.`);
                   setCleanupStatus("done");
                 } catch (err: any) {
                   setCleanupLog(`Fehler: ${err?.message ?? "Unbekannter Fehler"}`);

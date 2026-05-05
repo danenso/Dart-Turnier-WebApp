@@ -117,20 +117,6 @@ export default function PlayerStatsPage() {
             <h3 className="text-xl font-bold">{playerProfile.nickname || playerProfile.name}</h3>
             {playerProfile.email && <p className="text-sm text-zinc-400">{playerProfile.email}</p>}
           </div>
-          <div className="hidden sm:grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-black text-green-500">{playerProfile.wins || 0}</p>
-              <p className="text-xs text-zinc-400">Siege</p>
-            </div>
-            <div>
-              <p className="text-2xl font-black">{playerProfile.matchesPlayed || 0}</p>
-              <p className="text-xs text-zinc-400">Spiele</p>
-            </div>
-            <div>
-              <p className="text-2xl font-black text-red-500">{playerProfile.losses || 0}</p>
-              <p className="text-xs text-zinc-400">Niederlagen</p>
-            </div>
-          </div>
         </div>
 
         {error && (
