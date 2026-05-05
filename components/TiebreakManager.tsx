@@ -11,13 +11,16 @@ interface TiebreakProps {
   tournamentId: string;
   tiebreak: any;
   isAdmin: boolean;
+  tiebreakHits?: number;
 }
 
 export function TiebreakManager({
   tournamentId,
   tiebreak,
   isAdmin,
+  tiebreakHits,
 }: TiebreakProps) {
+  const hits = tiebreakHits ?? 4;
   const [manualOrder, setManualOrder] = useState<string[] | null>(null);
   const [scores, setScores] = useState<Record<string, Record<number, number>>>(
     tiebreak.scores || {},
@@ -102,9 +105,9 @@ export function TiebreakManager({
       }
     }
 
-    // Nach mind. 3 Runden: prüfen ob klarer Gewinner (kein Gleichstand)
+    // Nach mind. X Runden: prüfen ob klarer Gewinner (kein Gleichstand)
     const nextRound = tiebreak.currentRound + 1;
-    if (nextRound > 3) {
+    if (nextRound > hits) {
       const totals = tiebreak.playerIds.map((id: string) => {
         let total = 0;
         for (let r = 1; r <= tiebreak.currentRound; r++) total += scores[id]?.[r] || 0;
@@ -168,7 +171,7 @@ export function TiebreakManager({
   };
 
   const getActivePlayersForRound = (round: number) => {
-    if (round <= 3) return tiebreak.playerIds;
+    if (round <= hits) return tiebreak.playerIds;
     const totals = tiebreak.playerIds.map((id: string) => {
       let total = 0;
       for (let r = 1; r < round; r++) total += scores[id]?.[r] || 0;
@@ -240,7 +243,7 @@ export function TiebreakManager({
         {tiebreak.status === "pending" && tiebreak.spinWheelShown && (
           <div className="space-y-4">
             <p className="text-sm text-zinc-500">
-              Wurffolge für den Tiebreak festlegen (3 Pfeile auf{" "}
+              Wurffolge für den Tiebreak festlegen ({hits} Pfeile auf{" "}
               <strong>{tiebreak.targetNumber}</strong>).
             </p>
             {order.map((pId: string, idx: number) => (
@@ -290,7 +293,7 @@ export function TiebreakManager({
                   <tr>
                     <th className="px-4 py-2">Spieler</th>
                     {Array.from({
-                      length: Math.max(3, tiebreak.currentRound),
+                      length: Math.max(hits, tiebreak.currentRound),
                     }).map((_, i) => (
                       <th key={i} className="px-4 py-2 text-center">
                         R{i + 1}
@@ -308,7 +311,7 @@ export function TiebreakManager({
                           {getPlayerName(pId)}
                         </td>
                         {Array.from({
-                          length: Math.max(3, tiebreak.currentRound),
+                          length: Math.max(hits, tiebreak.currentRound),
                         }).map((_, i) => {
                           const round = i + 1;
                           const score = scores[pId]?.[round];
@@ -323,7 +326,7 @@ export function TiebreakManager({
                             <td key={round} className="px-2 py-2 text-center">
                               {isActive && isAdmin ? (
                                 <div className="flex justify-center gap-1">
-                                  {[0, 1, 2, 3].map((v) => (
+                                  {Array.from({ length: hits + 1 }, (_, i) => i).map((v) => (
                                     <button
                                       key={v}
                                       onClick={() => setScore(pId, round, v)}
@@ -355,7 +358,7 @@ export function TiebreakManager({
 
             {tiebreak.status === "in_progress" && (
               <p className="text-xs text-zinc-400 text-center">
-                Runde {tiebreak.currentRound} · 3 Pfeile auf Zahl{" "}
+                Runde {tiebreak.currentRound} · {hits} Pfeile auf Zahl{" "}
                 <strong>{tiebreak.targetNumber}</strong>
               </p>
             )}
@@ -365,7 +368,7 @@ export function TiebreakManager({
                 <Button onClick={saveRound} variant="outline">
                   Runde {tiebreak.currentRound} speichern
                 </Button>
-                {tiebreak.currentRound >= 3 && (
+                {tiebreak.currentRound >= hits && (
                   <Button
                     onClick={completeTiebreak}
                     className="bg-green-600 hover:bg-green-700"

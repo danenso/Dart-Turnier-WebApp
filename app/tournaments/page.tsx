@@ -37,6 +37,7 @@ import { CheckoutConfig, DEFAULT_CHECKOUT_CONFIG } from "@/lib/checkout-rules";
 import { MatchStartSelector } from "@/components/MatchStartSelector";
 import { DrawRule, MatchStartConfig, DEFAULT_DRAW_RULE, DEFAULT_MATCH_START } from "@/lib/match-rules";
 import { Trash2, LayoutGrid, List } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface TournamentTemplate {
   id: string;
@@ -45,6 +46,7 @@ interface TournamentTemplate {
   drawRule: DrawRule;
   matchStartConfig: MatchStartConfig;
   numberOfBoards: number;
+  tiebreakHits?: number;
   createdAt: string;
   createdBy: string;
   createdByEmail?: string;
@@ -65,6 +67,7 @@ export default function TournamentsPage() {
   const [drawRule, setDrawRule] = useState<DrawRule>(DEFAULT_DRAW_RULE);
   const [matchStartConfig, setMatchStartConfig] = useState<MatchStartConfig>(DEFAULT_MATCH_START);
   const [numberOfBoards, setNumberOfBoards] = useState(1);
+  const [tiebreakHits, setTiebreakHits] = useState(4);
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
   const [tournamentNumber, setTournamentNumber] = useState<number | "">("");
   const [isFinalTournament, setIsFinalTournament] = useState(false);
@@ -190,6 +193,7 @@ export default function TournamentsPage() {
     setDrawRule(tmpl.drawRule ?? DEFAULT_DRAW_RULE);
     setMatchStartConfig(tmpl.matchStartConfig ?? DEFAULT_MATCH_START);
     setNumberOfBoards(tmpl.numberOfBoards ?? 1);
+    setTiebreakHits(tmpl.tiebreakHits ?? 4);
   };
 
   const deleteTemplate = async (templateId: string) => {
@@ -210,6 +214,7 @@ export default function TournamentsPage() {
         drawRule,
         matchStartConfig,
         numberOfBoards,
+        tiebreakHits,
         createdAt: new Date().toISOString(),
         createdBy: user.uid,
         createdByEmail: user.email ?? "",
@@ -236,6 +241,7 @@ export default function TournamentsPage() {
         drawRule,
         matchStartConfig,
         numberOfBoards,
+        tiebreakHits,
         createdAt: new Date().toISOString(),
         ownerId: user.uid,
         isPublic: true,
@@ -491,22 +497,30 @@ export default function TournamentsPage() {
                     <div className="p-3 space-y-3">
                       <div>
                         <Label className="text-xs mb-1.5 block">Dartscheiben</Label>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                            <button
-                              key={n}
-                              type="button"
-                              onClick={() => setNumberOfBoards(n)}
-                              className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${
-                                numberOfBoards === n
-                                  ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-sm"
-                                  : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                              }`}
-                            >
-                              {n}
-                            </button>
-                          ))}
-                        </div>
+                        <Select value={String(numberOfBoards)} onValueChange={(v) => setNumberOfBoards(Number(v))}>
+                          <SelectTrigger className="w-36 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                              <SelectItem key={n} value={String(n)} className="text-xs">{n} {n === 1 ? "Scheibe" : "Scheiben"}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs mb-1.5 block">Tiebreak-Pfeile pro Runde</Label>
+                        <Select value={String(tiebreakHits)} onValueChange={(v) => setTiebreakHits(Number(v))}>
+                          <SelectTrigger className="w-36 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                              <SelectItem key={n} value={String(n)} className="text-xs">{n} {n === 1 ? "Pfeil" : "Pfeile"}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       {!isFinalTournament && (

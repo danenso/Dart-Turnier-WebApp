@@ -29,6 +29,7 @@ import { grantTournamentAchievements, grantGrandFinalAchievements } from "@/lib/
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { TiebreakManager } from "@/components/TiebreakManager";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import {
   Dialog,
@@ -70,6 +71,7 @@ export default function TournamentPage() {
   const [editDrawRule, setEditDrawRule] = useState<DrawRule>(DEFAULT_DRAW_RULE);
   const [editMatchStart, setEditMatchStart] = useState<MatchStartConfig>(DEFAULT_MATCH_START);
   const [editBoards, setEditBoards] = useState(1);
+  const [editTiebreakHits, setEditTiebreakHits] = useState(4);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [matchViewMode, setMatchViewMode] = useState<"card" | "list">("card");
   const [activeTab, setActiveTab] = useState("participants");
@@ -863,6 +865,7 @@ export default function TournamentPage() {
     setEditDrawRule(tournament.drawRule ?? DEFAULT_DRAW_RULE);
     setEditMatchStart(tournament.matchStartConfig ?? DEFAULT_MATCH_START);
     setEditBoards(tournament.numberOfBoards ?? 1);
+    setEditTiebreakHits(tournament.tiebreakHits ?? 4);
     setIsEditOpen(true);
   };
 
@@ -870,7 +873,7 @@ export default function TournamentPage() {
     if (!editTitle.trim()) return;
     setIsSavingEdit(true);
     try {
-      const updates: any = { title: editTitle.trim(), numberOfBoards: editBoards };
+      const updates: any = { title: editTitle.trim(), numberOfBoards: editBoards, tiebreakHits: editTiebreakHits };
       if (tournament.status === "draft") {
         updates.checkoutRule = editCheckout;
         updates.drawRule = editDrawRule;
@@ -938,6 +941,7 @@ export default function TournamentPage() {
                   tournamentId={id}
                   tiebreak={tb}
                   isAdmin={isAdmin}
+                  tiebreakHits={tournament.tiebreakHits ?? 4}
                 />
               </div>
             ))}
@@ -1353,6 +1357,7 @@ export default function TournamentPage() {
                         tournamentId={id}
                         tiebreak={tb}
                         isAdmin={isAdmin}
+                        tiebreakHits={tournament.tiebreakHits ?? 4}
                       />
                     </div>
                   ))}
@@ -2091,22 +2096,31 @@ export default function TournamentPage() {
 
               <div className="grid gap-2 pt-2 border-t">
                 <Label>Dartscheiben</Label>
-                <div className="flex flex-wrap gap-2">
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setEditBoards(n)}
-                      className={`w-10 h-10 rounded-lg text-sm font-bold transition-colors ${
-                        editBoards === n
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
+                <Select value={String(editBoards)} onValueChange={(v) => setEditBoards(Number(v))}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n} {n === 1 ? "Scheibe" : "Scheiben"}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2 pt-2 border-t">
+                <Label>Tiebreak-Treffer pro Runde</Label>
+                <Select value={String(editTiebreakHits)} onValueChange={(v) => setEditTiebreakHits(Number(v))}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n} {n === 1 ? "Pfeil" : "Pfeile"}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-zinc-500">Anzahl Pfeile, die pro Runde auf die Zielzahl geworfen werden (Standard: 4)</p>
               </div>
 
               <fieldset disabled={tournament?.status !== "draft"} className="contents">
